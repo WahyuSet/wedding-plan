@@ -1,0 +1,190 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  username       String?         @unique
+  password       String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  weddingProfile WeddingProfile?
+}
+
+model WeddingProfile {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groomName        String?
+  brideName        String?
+  weddingDate      DateTime?
+  venue            String?
+  totalBudget      Float             @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  budgetItems      BudgetItem[]
+  seserahanItems   SeserahanItem[]
+  operasionalTasks OperasionalTask[]
+  kuaDocuments     KuaDocument[]
+  digitalInvitation DigitalInvitation?
+}
+
+model BudgetItem {
+  id            String         @id @default(cuid())
+  profileId     String
+  profile       WeddingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  category      String
+  itemName      String
+  estimatedCost Float          @default(0)
+  actualCost    Float          @default(0)
+  amountPaid    Float          @default(0)
+  isPaid        Boolean        @default(false)
+  paymentStatus String         @default("unpaid")
+  vendorName    String?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model SeserahanItem {
+  id             String         @id @default(cuid())
+  profileId      String
+  profile        WeddingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  itemName       String
+  category       String         @default("lainnya")
+  estimatedPrice Float          @default(0)
+  actualPrice    Float          @default(0)
+  quantity       Int            @default(1)
+  isPrepared     Boolean        @default(false)
+  giver          String         @default("groom")
+  brand          String?
+  link           String?
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model OperasionalTask {
+  id            String         @id @default(cuid())
+  profileId     String
+  profile       WeddingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  taskName      String
+  phase         String
+  scheduledTime String?
+  scheduledDate DateTime?
+  assignedTo    String?
+  isDone        Boolean        @default(false)
+  priority      String         @default("medium")
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model KuaDocument {
+  id              String         @id @default(cuid())
+  profileId       String
+  profile         WeddingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  documentName    String
+  documentCode    String?
+  documentType    String         @default("persyaratan")
+  fromParty       String
+  deadline        DateTime?
+  isCompleted     Boolean        @default(false)
+  status          String         @default("pending")
+  reminderEnabled Boolean        @default(true)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model DigitalInvitation {
+  id              String          @id @default(cuid())
+  profileId       String          @unique
+  profile         WeddingProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  slug            String          @unique
+  theme           String          @default("noir-calla") // "noir-calla" | "chalk-and-vow" | "nocturne-botanica"
+  title           String          @default("The Wedding of")
+  openingQuote    String?         @default("Dan di antara tanda-tanda (kebesaran)-Nya ialah Dia menciptakan pasangan-pasangan untukmu dari jenismu sendiri, agar kamu cenderung dan merasa tenteram kepadanya, dan Dia menjadikan di antaramu rasa kasih dan sayang.")
+  quoteSource     String?         @default("QS. Ar-Rum: 21")
+  bgMusicUrl      String?         @default("https://assets.mixkit.co/music/preview/mixkit-romantic-moment-1147.mp3")
+  isMusicAutoPlay Boolean         @default(true)
+  isPublished     Boolean         @default(true)
+
+  // Foto Sampul & Background
+  coverPhotoUrl   String?         @default("https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&auto=format&fit=crop&q=80")
+  heroPhotoUrl    String?         @default("https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=1600&auto=format&fit=crop&q=80")
+
+  // Mempelai Pria
+  groomFullName   String?
+  groomNickName   String?
+  groomFather     String?
+  groomMother     String?
+  groomInstagram  String?
+  groomPhotoUrl   String?
+
+  // Mempelai Wanita
+  brideFullName   String?
+  brideNickName   String?
+  brideFather     String?
+  brideMother     String?
+  brideInstagram  String?
+  bridePhotoUrl   String?
+
+  // Detail Akad
+  akadDate        DateTime?
+  akadStartTime   String?         @default("08:00")
+  akadEndTime     String?         @default("10:00")
+  akadVenueName   String?
+  akadAddress     String?
+  akadMapUrl      String?
+
+  // Detail Resepsi
+  resepsiDate      DateTime?
+  resepsiStartTime String?        @default("11:00")
+  resepsiEndTime   String?        @default("14:00")
+  resepsiVenueName String?
+  resepsiAddress   String?
+  resepsiMapUrl    String?
+
+  // JSON Storages (cerita, galeri, bank)
+  loveStory       String?         // JSON: Array<{ year: string, title: string, story: string }>
+  galleryPhotos   String?         // JSON: Array<{ url: string, caption?: string }>
+  bankAccounts    String?         // JSON: Array<{ bankName: string, accountNumber: string, accountHolder: string, qrCodeUrl?: string }>
+  giftAddress     String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  rsvps           InvitationRsvp[]
+  guests          InvitationGuest[]
+}
+
+model InvitationRsvp {
+  id               String            @id @default(cuid())
+  invitationId     String
+  invitation       DigitalInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  guestName        String
+  attendanceStatus String            @default("hadir") // "hadir" | "tidak_hadir" | "ragu"
+  guestCount       Int               @default(1)
+  message          String?
+  createdAt        DateTime          @default(now())
+}
+
+model InvitationGuest {
+  id               String            @id @default(cuid())
+  invitationId     String
+  invitation       DigitalInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
+  phone            String?
+  category         String?           @default("keluarga") // "keluarga" | "sahabat" | "vip" | "rekan_kerja"
+  isSent           Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+}
+

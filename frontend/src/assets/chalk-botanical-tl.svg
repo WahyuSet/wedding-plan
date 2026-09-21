@@ -1,0 +1,54 @@
+﻿<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g opacity="0.75" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main curving branch -->
+    <path d="M0,0 Q60,40 100,120 T180,240 T280,310" stroke="#8CA68C" stroke-width="2.5" stroke-dasharray="6 3" />
+    <path d="M0,20 Q80,70 140,160 T220,290" stroke="#E8DDD0" stroke-width="1.2" opacity="0.7" />
+
+    <!-- Secondary vine -->
+    <path d="M40,0 Q90,90 190,140 T310,210" stroke="#8CA68C" stroke-width="1.8" />
+    <path d="M0,80 Q70,120 120,210 T180,315" stroke="#8CA68C" stroke-width="1.5" />
+
+    <!-- Foliage / leaves (Sage) -->
+    <path d="M70,80 C50,60 35,65 30,85 C25,105 50,110 70,80 Z" fill="#8CA68C" fill-opacity="0.35" stroke="#E8DDD0" stroke-width="1.2" />
+    <path d="M30,85 Q50,83 70,80" stroke="#E8DDD0" stroke-width="0.8" opacity="0.6" />
+
+    <path d="M100,120 C85,95 65,100 60,115 C55,135 80,145 100,120 Z" fill="#8CA68C" fill-opacity="0.4" stroke="#E8DDD0" stroke-width="1.2" />
+    <path d="M60,115 Q80,118 100,120" stroke="#E8DDD0" stroke-width="0.8" opacity="0.6" />
+
+    <path d="M140,160 C125,130 105,135 100,155 C95,175 120,185 140,160 Z" fill="#8CA68C" fill-opacity="0.3" stroke="#E8DDD0" stroke-width="1.2" />
+    
+    <path d="M110,60 C120,35 140,30 150,45 C160,65 135,75 110,60 Z" fill="#8CA68C" fill-opacity="0.35" stroke="#E8DDD0" stroke-width="1.2" />
+    <path d="M160,95 C180,75 200,80 205,95 C210,115 185,120 160,95 Z" fill="#8CA68C" fill-opacity="0.4" stroke="#E8DDD0" stroke-width="1.2" />
+
+    <!-- Peony 1 (Dusty Rose Blossom in corner) -->
+    <g transform="translate(48, 48)">
+      <path d="M-15,-5 C-35,-25 -15,-45 5,-35 C25,-45 45,-25 25,-5 C45,15 25,35 5,25 C-15,35 -35,15 -15,-5 Z" 
+            fill="#D4A5A5" fill-opacity="0.45" stroke="#E8DDD0" stroke-width="1.5" />
+      <path d="M-10,-5 C-25,-18 -10,-32 4,-25 C18,-32 32,-18 18,-5 C32,9 18,23 4,16 C-10,23 -25,9 -10,-5 Z" 
+            fill="#C4877A" fill-opacity="0.55" stroke="#E8DDD0" stroke-width="1.2" />
+      <path d="M0,0 Q-15,-20 -5,-30" stroke="#F5EFEB" stroke-width="1" opacity="0.75" />
+      <path d="M0,0 Q20,-15 25,-25" stroke="#F5EFEB" stroke-width="1" opacity="0.75" />
+      <path d="M0,0 Q-20,10 -25,20" stroke="#F5EFEB" stroke-width="1" opacity="0.75" />
+      <path d="M0,0 Q15,18 20,25" stroke="#F5EFEB" stroke-width="1" opacity="0.75" />
+      <circle cx="2" cy="0" r="6" fill="#F5EFEB" fill-opacity="0.8" />
+    </g>
+
+    <!-- Peony Bud 2 -->
+    <g transform="translate(190, 240)">
+      <path d="M-8,-10 C-18,-22 0,-30 10,-20 C20,-10 15,10 5,12 C-5,14 -12,0 -8,-10 Z" 
+            fill="#D4A5A5" fill-opacity="0.45" stroke="#E8DDD0" stroke-width="1.4" />
+      <path d="M-2,-8 C-8,-16 4,-20 8,-14 C12,-8 8,4 2,6 Z" 
+            fill="#C4877A" fill-opacity="0.55" stroke="#E8DDD0" stroke-width="1" />
+      <path d="M0,8 Q5,22 15,28" stroke="#8CA68C" stroke-width="1.5" />
+    </g>
+
+    <!-- Chalk pollen specks -->
+    <circle cx="85" cy="40" r="1.5" fill="#F5EFEB" opacity="0.8" />
+    <circle cx="120" cy="75" r="1" fill="#F5EFEB" opacity="0.7" />
+    <circle cx="150" cy="130" r="1.5" fill="#F5EFEB" opacity="0.8" />
+    <circle cx="175" cy="180" r="1" fill="#F5EFEB" opacity="0.6" />
+    <circle cx="210" cy="115" r="1.5" fill="#F5EFEB" opacity="0.75" />
+    <circle cx="240" cy="270" r="1" fill="#F5EFEB" opacity="0.7" />
+    <circle cx="60" cy="170" r="1.5" fill="#F5EFEB" opacity="0.6" />
+  </g>
+</svg>
