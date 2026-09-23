@@ -1,0 +1,18 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /invitation/
+
+# Disallow private user dashboards and data
+Disallow: /dashboard
+Disallow: /budget
+Disallow: /seserahan
+Disallow: /operasional
+Disallow: /dokumen-kua
+Disallow: /invitation-admin
+Disallow: /settings
+
+# Sitemap
+Sitemap: https://weddingplan.id/sitemap.xml

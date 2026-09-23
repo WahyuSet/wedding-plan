@@ -1,16 +1,17 @@
 import React from "react";
 import { Calendar, MapPin, Heart } from "lucide-react";
 import { useAuthStore } from "../../store/authStore.js";
-import { formatDateIndo } from "../../lib/utils.js";
+import { formatDateIndo, cn } from "../../lib/utils.js";
 import { Badge } from "../ui/Badge.js";
 
 export interface TopbarProps {
   title: string;
   description?: string;
   action?: React.ReactNode;
+  sticky?: boolean;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ title, description, action }) => {
+export const Topbar: React.FC<TopbarProps> = ({ title, description, action, sticky = true }) => {
   const { profile } = useAuthStore();
 
   let daysRemaining: number | null = null;
@@ -20,7 +21,12 @@ export const Topbar: React.FC<TopbarProps> = ({ title, description, action }) =>
   }
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/70 sticky top-0 z-20 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <header
+      className={cn(
+        "bg-white/80 backdrop-blur-md border-b border-slate-200/70 px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4",
+        sticky && "sticky top-0 z-20"
+      )}
+    >
       {/* Title & Description */}
       <div>
         <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">

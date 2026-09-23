@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 import { Menu, HeartHandshake } from "lucide-react";
 import { Sidebar } from "./Sidebar.js";
 import { MobileNav } from "./MobileNav.js";
-import { Toaster } from "sonner";
 
 export const DashboardLayout: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -44,7 +43,6 @@ export const DashboardLayout: React.FC = () => {
       </div>
 
       <MobileNav />
-      <Toaster position="top-right" richColors closeButton />
     </div>
   );
 };

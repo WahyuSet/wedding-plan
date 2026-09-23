@@ -10,6 +10,7 @@ import operasionalRoutes from "./routes/operasional.routes.js";
 import kuaRoutes from "./routes/kua.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import invitationRoutes from "./routes/invitation.routes.js";
+import { adminRoutes, publicSettingsRoutes } from "./routes/admin.routes.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 
 dotenv.config();
@@ -21,11 +22,19 @@ const rawOrigins = process.env.CORS_ORIGIN
   : defaultOrigins;
 const allowedOrigins = Array.from(new Set([...rawOrigins, ...defaultOrigins]));
 
+const isLocalhost = (origin: string) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
 // Middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes("*") ||
+        allowedOrigins.includes(origin) ||
+        isLocalhost(origin)
+      ) {
         callback(null, true);
       } else {
         callback(null, false);
@@ -94,6 +103,8 @@ app.use("/api/operasional", operasionalRoutes);
 app.use("/api/kua", kuaRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/invitation", invitationRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/settings", publicSettingsRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { HeartHandshake, Lock, AtSign } from "lucide-react";
+import { HeartHandshake, Lock, AtSign, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../lib/api.js";
 import { useAuthStore } from "../../store/authStore.js";
@@ -21,6 +21,7 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const {
     register,
@@ -33,18 +34,28 @@ export const LoginPage: React.FC = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       setIsLoading(true);
+      setAuthError(null);
       const res = await api.post("/auth/login", data);
 
       if (res.data.success) {
         login(res.data.data.token, res.data.data.user, res.data.data.profile);
-        toast.success("Selamat datang kembali! 👋", {
-          description: `Login sebagai ${res.data.data.profile?.groomName || "Pengguna"}`,
-        });
-        navigate("/dashboard");
+        if (res.data.data.user?.role === "ADMIN") {
+          toast.success("Selamat datang, Superadmin! 🛡️", {
+            description: "Mengakses Konsol Administrator WeddingPlan.",
+          });
+          navigate("/admin");
+        } else {
+          toast.success("Selamat datang kembali! 👋", {
+            description: `Login sebagai ${res.data.data.profile?.groomName || "Pengguna"}`,
+          });
+          navigate("/dashboard");
+        }
       }
     } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Email / username atau password tidak sesuai.";
+      setAuthError(errorMsg);
       toast.error("Gagal Masuk", {
-        description: error.response?.data?.message || "Email / username atau password tidak sesuai.",
+        description: errorMsg,
       });
     } finally {
       setIsLoading(false);
@@ -67,6 +78,17 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
+        {/* Inline Error Banner (Dismisses on user typing) */}
+        {authError && (
+          <div className="mb-6 flex items-start gap-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200/90 text-[#BE123C] text-xs leading-relaxed animate-fade-in shadow-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#E11D48] mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-[#E11D48]">Gagal Masuk</p>
+              <p className="text-rose-700 mt-0.5">{authError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
@@ -75,7 +97,11 @@ export const LoginPage: React.FC = () => {
             placeholder="nama@email.com atau username"
             leftIcon={<AtSign className="w-4 h-4" />}
             error={errors.identifier?.message}
-            {...register("identifier")}
+            {...register("identifier", {
+              onChange: () => {
+                if (authError) setAuthError(null);
+              },
+            })}
           />
 
           <Input
@@ -84,7 +110,11 @@ export const LoginPage: React.FC = () => {
             placeholder="••••••••"
             leftIcon={<Lock className="w-4 h-4" />}
             error={errors.password?.message}
-            {...register("password")}
+            {...register("password", {
+              onChange: () => {
+                if (authError) setAuthError(null);
+              },
+            })}
           />
 
           <Button type="submit" variant="primary" className="w-full py-2.5 mt-2" isLoading={isLoading}>

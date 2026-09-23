@@ -16,7 +16,6 @@ import {
   ExternalLink,
   ChevronDown,
   Instagram,
-  Sparkles,
   Users,
   CheckCircle2,
   XCircle,
@@ -29,13 +28,14 @@ import { DigitalInvitation, LoveStoryItem, GalleryPhotoItem, BankAccountItem, In
 import { formatDateIndo } from "../../lib/utils.js";
 import { API_BASE_URL } from "../../lib/api.js";
 import { ChalkAndVowTheme } from "./themes/ChalkAndVowTheme.js";
+import { NoirCallaTheme } from "./themes/NoirCallaTheme.js";
 
 // Theme configuration profiles
 const THEME_STYLES = {
   "noir-calla": {
     bg: "bg-[#080B11]",
     text: "text-slate-100",
-    textMuted: "text-slate-400",
+    textMuted: "text-slate-300",
     textAccent: "text-[#D4AF37]",
     headingFont: "font-serif",
     cardBg: "bg-[#0F1420]/90 backdrop-blur-md",
@@ -44,8 +44,8 @@ const THEME_STYLES = {
     buttonPrimary: "bg-[#D4AF37] hover:bg-[#C59F2D] text-slate-950 font-bold",
     badge: "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30",
     divider: "border-slate-800",
-    inputBg: "bg-slate-900/90 border-slate-700 text-white placeholder-slate-500",
-    scrimOverlay: "bg-gradient-to-t from-[#080B11] via-[#080B11]/75 to-[#080B11]/90",
+    inputBg: "bg-[#0A0E17] border-[#D4AF37]/20 text-slate-200 placeholder-slate-400/60",
+    scrimOverlay: "bg-gradient-to-t from-[#080B11]/80 via-[#080B11]/50 to-[#080B11]/85",
     bodyTexture: "radial-gradient(ellipse at top, rgba(212,175,55,0.06), transparent 70%), radial-gradient(ellipse at bottom, rgba(15,20,32,0.8), #080B11)",
   },
   "chalk-and-vow": {
@@ -226,6 +226,26 @@ export const StandaloneInvitationPage: React.FC = () => {
   const gallery: GalleryPhotoItem[] = Array.isArray(invitation.galleryPhotos) ? invitation.galleryPhotos : [];
   const bankAccounts: BankAccountItem[] = Array.isArray(invitation.bankAccounts) ? invitation.bankAccounts : [];
   const rsvps: InvitationRsvp[] = invitation.rsvps || [];
+
+  // Dedicated Theme Architecture: Noir Calla (Dark Gold)
+  if (invitation.theme === "noir-calla") {
+    return (
+      <>
+        {invitation.bgMusicUrl && (
+          <audio ref={audioRef} src={invitation.bgMusicUrl} loop preload="auto" />
+        )}
+        <NoirCallaTheme
+          invitation={invitation}
+          guestName={guestName}
+          audioRef={audioRef}
+          isPlayingMusic={isPlayingMusic}
+          toggleMusic={toggleMusic}
+          onRsvpSubmit={(payload) => rsvpMutation.mutateAsync(payload)}
+          isSubmittingRsvp={rsvpMutation.isPending}
+        />
+      </>
+    );
+  }
 
   // Dedicated Theme Architecture: Chalk and Vow (Split Viewport)
   if (invitation.theme === "chalk-and-vow") {

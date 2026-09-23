@@ -13,6 +13,7 @@ import {
   Coins,
   ArrowRight,
   ArrowLeft,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../lib/api.js";
@@ -43,6 +44,7 @@ export const RegisterPage: React.FC = () => {
   const { login } = useAuthStore();
   const [step, setStep] = useState<1 | 2>(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const {
     register,
@@ -57,6 +59,7 @@ export const RegisterPage: React.FC = () => {
   });
 
   const nextStep = async () => {
+    if (authError) setAuthError(null);
     const isValid = await trigger(["email", "password", "confirmPassword"]);
     if (isValid) setStep(2);
   };
@@ -64,6 +67,7 @@ export const RegisterPage: React.FC = () => {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true);
+      setAuthError(null);
       const res = await api.post("/auth/register", {
         email: data.email,
         password: data.password,
@@ -82,8 +86,10 @@ export const RegisterPage: React.FC = () => {
         navigate("/dashboard");
       }
     } catch (error: any) {
+      const errorMsg = error.response?.data?.message || "Terjadi kesalahan saat mendaftar.";
+      setAuthError(errorMsg);
       toast.error("Pendaftaran Gagal", {
-        description: error.response?.data?.message || "Terjadi kesalahan saat mendaftar.",
+        description: errorMsg,
       });
     } finally {
       setIsLoading(false);
@@ -120,6 +126,17 @@ export const RegisterPage: React.FC = () => {
           />
         </div>
 
+        {/* Inline Error Banner */}
+        {authError && (
+          <div className="mb-6 flex items-start gap-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200/90 text-[#BE123C] text-xs leading-relaxed animate-fade-in shadow-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#E11D48] mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-[#E11D48]">Pendaftaran Gagal</p>
+              <p className="text-rose-700 mt-0.5">{authError}</p>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {step === 1 && (
             <div className="space-y-4 animate-fade-in">
@@ -129,7 +146,11 @@ export const RegisterPage: React.FC = () => {
                 placeholder="nama@email.com"
                 leftIcon={<Mail className="w-4 h-4" />}
                 error={errors.email?.message}
-                {...register("email")}
+                {...register("email", {
+                  onChange: () => {
+                    if (authError) setAuthError(null);
+                  },
+                })}
               />
 
               <Input
@@ -138,7 +159,11 @@ export const RegisterPage: React.FC = () => {
                 placeholder="Minimal 6 karakter"
                 leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
-                {...register("password")}
+                {...register("password", {
+                  onChange: () => {
+                    if (authError) setAuthError(null);
+                  },
+                })}
               />
 
               <Input
@@ -147,7 +172,11 @@ export const RegisterPage: React.FC = () => {
                 placeholder="Ketik ulang kata sandi"
                 leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.confirmPassword?.message}
-                {...register("confirmPassword")}
+                {...register("confirmPassword", {
+                  onChange: () => {
+                    if (authError) setAuthError(null);
+                  },
+                })}
               />
 
               <Button
@@ -170,7 +199,11 @@ export const RegisterPage: React.FC = () => {
                   placeholder="Contoh: Budi Santoso"
                   leftIcon={<User className="w-4 h-4" />}
                   error={errors.groomName?.message}
-                  {...register("groomName")}
+                  {...register("groomName", {
+                    onChange: () => {
+                      if (authError) setAuthError(null);
+                    },
+                  })}
                 />
 
                 <Input
@@ -178,7 +211,11 @@ export const RegisterPage: React.FC = () => {
                   placeholder="Contoh: Sari Rahmawati"
                   leftIcon={<User className="w-4 h-4" />}
                   error={errors.brideName?.message}
-                  {...register("brideName")}
+                  {...register("brideName", {
+                    onChange: () => {
+                      if (authError) setAuthError(null);
+                    },
+                  })}
                 />
               </div>
 

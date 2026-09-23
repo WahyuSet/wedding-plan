@@ -56,6 +56,18 @@ export const changePasswordSchema = z.object({
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Check if new registrations are enabled by administrator
+    const registrationSetting = await prisma.systemSetting.findUnique({
+      where: { key: "user_registration" },
+    });
+    if (registrationSetting && registrationSetting.value === "false") {
+      res.status(403).json({
+        success: false,
+        message: "Pendaftaran pengguna baru sedang ditutup sementara oleh administrator.",
+      });
+      return;
+    }
+
     const { email, password, groomName, brideName, weddingDate, venue, totalBudget } = req.body;
 
     const existingUser = await prisma.user.findUnique({
@@ -121,7 +133,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const token = jwt.sign(
-      { userId: newUser.user.id, email: newUser.user.email },
+      { userId: newUser.user.id, email: newUser.user.email, role: newUser.user.role },
       JWT_SECRET,
       { expiresIn: `${COOKIE_EXPIRES_DAYS}d` }
     );
@@ -142,6 +154,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
           id: newUser.user.id,
           email: newUser.user.email,
           username: null,
+          role: newUser.user.role,
         },
         profile: newUser.profile,
       },
@@ -189,7 +202,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: `${COOKIE_EXPIRES_DAYS}d` }
     );
@@ -210,6 +223,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           id: user.id,
           email: user.email,
           username: user.username,
+          role: user.role,
         },
         profile: user.weddingProfile,
       },
@@ -239,6 +253,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
         id: true,
         email: true,
         username: true,
+        role: true,
         createdAt: true,
         weddingProfile: true,
       },

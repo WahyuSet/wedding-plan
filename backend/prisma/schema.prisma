@@ -12,6 +12,7 @@ model User {
   email          String          @unique
   username       String?         @unique
   password       String
+  role           String          @default("USER") // "USER" | "ADMIN"
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   weddingProfile WeddingProfile?
@@ -186,5 +187,12 @@ model InvitationGuest {
   category         String?           @default("keluarga") // "keluarga" | "sahabat" | "vip" | "rekan_kerja"
   isSent           Boolean           @default(false)
   createdAt        DateTime          @default(now())
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String   @default("true")
+  label     String
+  updatedAt DateTime @updatedAt
 }
 

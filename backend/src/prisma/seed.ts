@@ -10,6 +10,45 @@ async function main() {
   const demoEmail = "demo@wedding.com";
   const demoPassword = "password123";
 
+  // 0. Seed Superadmin Account
+  const adminEmail = "admin@weddingplan.id";
+  const adminPassword = "@admin2026";
+
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: adminEmail },
+  });
+  if (existingAdmin) {
+    await prisma.user.delete({ where: { email: adminEmail } });
+    console.log("  Membersihkan akun superadmin lama...");
+  }
+
+  const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
+  await prisma.user.create({
+    data: {
+      email: adminEmail,
+      username: "superadmin",
+      password: hashedAdminPassword,
+      role: "ADMIN",
+    },
+  });
+  console.log("  ✅ Akun Superadmin dibuat: admin@weddingplan.id");
+
+  // 0.1 Seed System Settings / Feature Flags
+  const defaultSettings = [
+    { key: "digital_invitation", value: "true", label: "Modul Undangan Digital" },
+    { key: "user_registration", value: "true", label: "Pendaftaran User Baru" },
+    { key: "system_maintenance", value: "false", label: "Mode Maintenance Sistem" },
+  ];
+
+  for (const setting of defaultSettings) {
+    await prisma.systemSetting.upsert({
+      where: { key: setting.key },
+      create: setting,
+      update: { label: setting.label },
+    });
+  }
+  console.log("  ✅ 3 Feature Flags default diinisialisasi.");
+
   // Hapus jika sudah ada sebelumnya agar fresh
   const existing = await prisma.user.findUnique({
     where: { email: demoEmail },
@@ -22,11 +61,12 @@ async function main() {
 
   const hashedPassword = await bcrypt.hash(demoPassword, 10);
 
-  // Buat User + Profile
+  // Buat User Demo + Profile
   const user = await prisma.user.create({
     data: {
       email: demoEmail,
       password: hashedPassword,
+      role: "USER",
       weddingProfile: {
         create: {
           groomName: "Budi Santoso",

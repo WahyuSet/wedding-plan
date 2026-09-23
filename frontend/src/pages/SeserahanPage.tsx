@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { api } from "../lib/api.js";
 import { SeserahanItem, SeserahanTemplate, ApiResponse } from "../types/index.js";
 import { useAuthStore } from "../store/authStore.js";
-import { formatRupiah, formatShortRupiah } from "../lib/utils.js";
+import { formatRupiah, formatShortRupiah, cn } from "../lib/utils.js";
 import { exportSeserahanExcel } from "../lib/exportUtils.js";
 import { Topbar } from "../components/layout/Topbar.js";
 import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
@@ -86,6 +86,17 @@ export const SeserahanPage: React.FC = () => {
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SeserahanItem | null>(null);
   const [selectedTemplateIndices, setSelectedTemplateIndices] = useState<number[]>([]);
+
+  // Sticky scroll detection
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 60);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Fetch Items
   const { data, isLoading } = useQuery<
@@ -272,6 +283,7 @@ export const SeserahanPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <Topbar
+        sticky={false}
         title="Daftar Seserahan & Hantaran"
         description="Kelola barang bawaan seserahan adat pernikahan dari kedua belah pihak mempelai"
         action={
@@ -304,34 +316,73 @@ export const SeserahanPage: React.FC = () => {
         }
       />
 
-      {/* 1. Progress Banner Card */}
-      <Card className="bg-gradient-to-r from-amber-50/80 via-rose-50/50 to-white border border-amber-200/60 p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+      {/* 1. Progress Banner Card (Sticky on scroll) */}
+      <Card
+        className={cn(
+          "sticky top-[52px] md:top-3 z-20 transition-all duration-300",
+          "border border-amber-200/70",
+          isScrolled
+            ? "bg-white/95 backdrop-blur-md shadow-lg p-3.5 sm:p-4 border-amber-300/80 rounded-2xl"
+            : "bg-gradient-to-r from-amber-50/80 via-rose-50/50 to-white p-5 sm:p-6 shadow-xs"
+        )}
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 md:gap-6">
+          <div className="space-y-1 sm:space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="gold" size="sm">
                 Progres Kesiapan
               </Badge>
               <span className="text-xs font-bold text-slate-800">
                 {summary.preparedCount} dari {summary.totalItems} Barang Siap
               </span>
+              {isScrolled && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={openAddModal}
+                  className="h-7 px-2.5 text-xs py-0 ml-1 hidden sm:inline-flex"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                >
+                  Tambah Item
+                </Button>
+              )}
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Total Nilai Seserahan: {formatRupiah(summary.totalActualPrice || summary.totalEstimatedPrice)}
+            <h2
+              className={`font-extrabold text-slate-900 tracking-tight transition-all ${
+                isScrolled ? "text-base sm:text-lg md:text-xl" : "text-xl sm:text-2xl"
+              }`}
+            >
+              Total Nilai Seserahan:{" "}
+              <span className="text-amber-700">
+                {formatRupiah(summary.totalActualPrice || summary.totalEstimatedPrice)}
+              </span>
             </h2>
-            <p className="text-xs text-slate-500">
-              Centang kotak pada kartu di bawah saat barang seserahan telah dibeli dan dihias.
-            </p>
+            {!isScrolled && (
+              <p className="text-xs text-slate-500">
+                Centang kotak pada kartu di bawah saat barang seserahan telah dibeli dan dihias.
+              </p>
+            )}
           </div>
 
-          <div className="w-full md:w-72 bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-amber-100 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
+          <div
+            className={`transition-all duration-300 ${
+              isScrolled
+                ? "w-full md:w-64 bg-amber-50/70 p-2.5 sm:p-3 rounded-xl border border-amber-200/80"
+                : "w-full md:w-72 bg-white/80 backdrop-blur-sm p-4 rounded-2xl border border-amber-100 shadow-xs"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-semibold text-slate-600">Persentase</span>
               <span className="text-sm font-black text-amber-600">
                 {summary.progressPercentage}%
               </span>
             </div>
-            <ProgressBar value={summary.progressPercentage} colorVariant="amber" size="md" />
+            <ProgressBar
+              value={summary.progressPercentage}
+              colorVariant="amber"
+              size={isScrolled ? "sm" : "md"}
+              showPercentage={false}
+            />
           </div>
         </div>
       </Card>

@@ -65,6 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             id: res.data.data.id,
             email: res.data.data.email,
             username: res.data.data.username ?? null,
+            role: res.data.data.role ?? "USER",
           },
           profile: res.data.data.weddingProfile,
           isAuthenticated: true,

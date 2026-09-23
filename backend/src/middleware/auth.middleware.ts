@@ -33,14 +33,23 @@ export const authMiddleware = async (
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: string;
       email: string;
+      role?: string;
     };
 
-    // Find profile
-    const profile = await prisma.weddingProfile.findUnique({
-      where: { userId: decoded.userId },
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: { weddingProfile: true },
     });
 
-    if (!profile) {
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        message: "Pengguna tidak ditemukan atau telah dihapus.",
+      });
+      return;
+    }
+
+    if (!user.weddingProfile && user.role !== "ADMIN") {
       res.status(404).json({
         success: false,
         message: "Profil pernikahan tidak ditemukan.",
@@ -49,9 +58,10 @@ export const authMiddleware = async (
     }
 
     req.user = {
-      userId: decoded.userId,
-      email: decoded.email,
-      profileId: profile.id,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      profileId: user.weddingProfile?.id,
     };
 
     next();
