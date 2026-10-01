@@ -62,6 +62,7 @@ Jangan menebak dan jangan membeli atau mengubah apa pun tanpa persetujuan user.
 2. Siapa yang mengubah DNS: user sendiri, atau agent diberi akses.
 3. Hosting backend yang dipakai dan apakah mendukung lebih dari satu custom domain pada satu service.
 4. Apakah sudah ada undangan yang linknya tersebar ke tamu. Ini menentukan seberapa hati-hati soal link lama.
+5. Apakah sudah ada instance yang live dengan data pengguna. Bila ya, ikuti bagian 4A sebelum bagian 5.
 
 ## 4. Jangan lakukan ini
 
@@ -72,7 +73,158 @@ Jangan menebak dan jangan membeli atau mengubah apa pun tanpa persetujuan user.
 5. **Jangan build image dari folder `backend/`.** Build context harus akar repo karena image ikut mem-build `frontend/`.
 6. **Jangan memakai `prisma db push`.** Gunakan `prisma migrate deploy` (sudah dijalankan otomatis saat container start). Fitur ini tidak menambah migrasi.
 7. **Jangan mengganti domain undangan setelah link tersebar** tanpa redirect dari domain lama. Semua link yang sudah dikirim ke tamu akan mati.
-8. **Jangan menulis secret** (`JWT_SECRET`, `ADMIN_PASSWORD`) ke file yang ikut di-commit atau ke dokumen ini.
+8. **Jangan menjalankan container baru di atas data live tanpa backup dan tanpa baseline migrasi.** Lihat bagian 4A.
+9. **Jangan menulis secret** (`JWT_SECRET`, `ADMIN_PASSWORD`) ke file yang ikut di-commit atau ke dokumen ini.
+
+## 4A. Bila sudah ada data live (upgrade dari versi lama)
+
+Bagian ini wajib dibaca bila sudah ada instance yang dipakai pengguna. Versi sebelum commit `0f6cd26` tidak punya folder migrasi, jadi database-nya dibuat dengan `prisma db push` dan tidak punya tabel `_prisma_migrations`.
+
+Hasil simulasi 2026-10-01 (database schema commit `fd85a85` berisi data contoh, lalu dimigrasikan ke versi sekarang):
+
+- `prisma migrate deploy` langsung pada database lama **gagal dengan error P3005** ("The database schema is not empty"). Data tidak tersentuh. Di Docker, container berhenti saat start karena perintah itu dijalankan sebelum server.
+- Setelah `prisma migrate resolve --applied 0_init`, `migrate deploy` berhasil dan semua data tetap ada: akun dan hash password, anggaran, undangan (slug dan status publikasi tidak berubah), tamu, dan RSVP.
+- Tiap tamu lama mendapat kode acak 12 karakter. RSVP lama tetap ada tetapi tidak terikat ke tamu tertentu (`guestId` kosong), sama seperti sebelumnya.
+
+Detail instance yang live (domain, IP, keadaan reverse proxy) **sengaja tidak ditulis di dokumen ini karena repo ini publik**. Bila ada, baca `docs/instance.local.md` (tidak ikut git); bila tidak ada, tanyakan ke pemilik. Jangan menulis domain, IP, atau isi `.env` instance ke file yang ikut di-commit.
+
+### Jalur A: tetap systemd di VPS (disarankan bila versi lama berjalan lewat systemd)
+
+Fitur domain undangan tidak butuh Docker. Backend cukup menemukan build frontend di `INVITATION_DIST_DIR`. Dengan tetap memakai systemd, file database tidak perlu dipindahkan sama sekali.
+
+Kerjakan dalam dua tahap, supaya masalah data dan masalah domain tidak tercampur.
+
+**Bila dashboard dan API berada di satu domain** (dashboard dibuild dengan `VITE_API_URL="/api"` dan reverse proxy meneruskan `/api` ke backend), periksa tiga hal di konfigurasi Nginx domain dashboard sebelum Tahap 1 selesai:
+
+- `/uploads/` dan `/share/` harus ikut diteruskan ke backend. Versi lama tidak punya keduanya, jadi konfigurasi lama biasanya hanya meneruskan `/api`, dan kedua path itu jatuh ke `index.html` dashboard. Cara cek dari luar: `curl -sI https://<domain-dashboard>/share/tes` yang menjawab `text/html` dashboard berarti belum diteruskan.
+
+  ```nginx
+  # File upload (foto/musik) dan halaman share dilayani backend, bukan folder dashboard.
+  location /uploads/ { proxy_pass http://127.0.0.1:5000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }
+  location /share/   { proxy_pass http://127.0.0.1:5000; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }
+  ```
+
+- `client_max_body_size 12m;` di blok `/api`. Batas bawaan Nginx 1 MB, sedangkan upload foto sampai 5 MB dan musik sampai 10 MB. Tanpa ini upload gagal dengan 413.
+- `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` di blok `/api`. Versi baru membatasi permintaan per IP (login: 10 percobaan per 15 menit). Tanpa header ini semua pengguna terhitung sebagai satu IP dan saling mengunci.
+
+Pada susunan satu domain seperti ini, `FRONTEND_URL` dan `API_PUBLIC_URL` berisi origin yang sama, dan `COOKIE_DOMAIN` **jangan diisi**: cookie yang terikat ke host dashboard tidak ikut terkirim ke subdomain lain, termasuk domain undangan.
+
+Port `5000` di contoh mengikuti `.env.example`; pakai port yang sebenarnya dipakai service. Setelah mengubah Nginx: `sudo nginx -t && sudo systemctl reload nginx`.
+
+**Tahap 1: naik versi tanpa domain undangan** (`INVITATION_URL` belum diisi)
+
+1. Catat commit yang sedang jalan (`git rev-parse HEAD`) untuk rollback, dan pastikan Node di VPS versi 20.9 atau lebih baru (`node -v`). Itu syarat pustaka `sharp` yang dipakai untuk upload foto; CI memakai Node 22.
+2. Hentikan service: `sudo systemctl stop <nama-service>`.
+3. Backup database ke luar folder aplikasi. Jangan lanjut sebelum file backup ada dan ukurannya masuk akal:
+
+   ```bash
+   mkdir -p ~/backup && cp backend/prisma/dev.db ~/backup/wedding-$(date +%F-%H%M).db && ls -l ~/backup
+   ```
+
+   Bila ada file `dev.db-journal` di sampingnya, service belum berhenti dengan bersih. Selesaikan itu dulu.
+4. Ambil kode baru: `git fetch && git checkout main && git pull --ff-only`.
+5. Sesuaikan `backend/.env` (file ini tidak ikut git, jadi isinya masih versi lama):
+
+   | Variabel | Yang harus dilakukan |
+   | --- | --- |
+   | `JWT_SECRET` | **Wajib minimal 32 karakter**, kalau tidak server menolak start. Versi lama punya nilai cadangan di kode yang ikut tersimpan di riwayat git; bila `.env` lama tidak mengisinya, buat nilai baru. Mengganti nilainya membuat semua pengguna login ulang. |
+   | `NODE_ENV` | Harus `production`. |
+   | `FRONTEND_URL` | Baru, wajib: origin dashboard, mis. `https://app.contoh.id`. Default-nya `http://localhost:5173`. |
+   | `API_PUBLIC_URL` | Baru: origin API, dipakai untuk URL file upload. |
+   | `UPLOAD_DIR` | Baru: folder upload. Pakai path absolut di luar folder repo dan pastikan bisa ditulis user service. |
+   | `COOKIE_DOMAIN` | Isi `.contoh.id` bila dashboard dan API berbeda subdomain. |
+   | `CORS_ORIGIN`, `DATABASE_URL`, `PORT` | Biarkan seperti semula. |
+
+6. Build backend dan frontend:
+
+   ```bash
+   cd backend && npm ci && npm run build
+   ```
+
+   ```bash
+   cd ../frontend && npm ci && npm run build
+   ```
+
+   `frontend/.env` lama (berisi `VITE_API_URL`) tetap dipakai untuk build dashboard. Bila `root` Nginx untuk dashboard bukan `frontend/dist` di repo ini, salin hasil build ke folder itu seperti deploy sebelumnya.
+7. Tandai baseline, lalu jalankan migrasi (dari folder `backend`). Kedua perintah ini sudah diuji pada simulasi:
+
+   ```bash
+   npx prisma migrate resolve --applied 0_init
+   ```
+
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+   Baseline hanya sekali seumur database. Bila `migrate deploy` gagal, jangan start service; lihat Rollback.
+8. Start service dan lihat lognya: `sudo systemctl start <nama-service> && journalctl -u <nama-service> -n 30`. Unit systemd tidak perlu diubah selama `WorkingDirectory`-nya folder `backend` dan `ExecStart`-nya `node dist/index.js`.
+9. Cek data: login dengan akun lama, buka anggaran, buka undangan yang sebelumnya sudah dipublikasikan, dan buka satu tautan tamu lama.
+10. Ganti password superadmin bila masih memakai nilai lama dari versi sebelumnya (nilai itu ada di riwayat git). Dari folder `backend`, dengan `NODE_ENV=production` di `.env`:
+
+    ```bash
+    ADMIN_PASSWORD='<password baru, minimal 12 karakter>' npm run seed:prod
+    ```
+
+    Seed di production hanya memperbarui password superadmin dan memastikan feature flag ada. **Jangan menjalankan `npm run seed` (versi development) di VPS**: ia menghapus dan membuat ulang akun demo.
+
+**Tahap 2: aktifkan domain undangan** (setelah Tahap 1 stabil)
+
+1. Buat record DNS `A` untuk domain undangan ke IP VPS, tunggu sampai `nslookup <domain-undangan>` menjawab IP itu, lalu terbitkan sertifikat SSL-nya (mis. `sudo certbot --nginx -d <domain-undangan>`).
+2. Tambahkan server block Nginx yang meneruskan **semua** path domain undangan ke backend, dengan header `Host` asli:
+
+   ```nginx
+   server {
+     server_name <domain-undangan>;
+     location / {
+       proxy_pass http://127.0.0.1:5000;
+       proxy_set_header Host $host;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     }
+   }
+   ```
+
+   Jangan arahkan domain undangan ke folder `frontend/dist` secara langsung (lihat bagian 4 nomor 1). Bila varian `www` juga dipakai, buat server block terpisah yang hanya me-redirect ke domain utamanya; backend hanya mengenali hostname persis seperti di `INVITATION_URL`.
+3. Tambahkan ke `backend/.env`: `INVITATION_URL=https://<domain-undangan>` dan `INVITATION_DIST_DIR=<path absolut ke frontend/dist>`.
+4. Restart service, lalu jalankan pengecekan bagian 6. Pada susunan satu domain, domain dashboard dan domain API di perintah-perintah itu sama.
+
+Setelah Tahap 2, tautan tamu berbentuk `https://<domain-undangan>/<slug>/<nama-tamu>-<kode>`, dan tautan lama di `<domain-dashboard>/invitation/...` dialihkan ke sana.
+
+Contoh Nginx dan langkah Tahap 2 belum pernah dijalankan di server sungguhan; sesuaikan dengan konfigurasi yang sudah ada di VPS.
+
+### Jalur B: pindah ke Docker
+
+Hanya bila pemilik memang ingin pindah dari systemd. Perintah `docker` di bawah belum pernah dijalankan; periksa hasil tiap langkah.
+
+1. Hentikan service lama dan backup database seperti Jalur A langkah 2–3.
+2. Salin database ke volume container dengan nama `wedding.db`, pemilik user `node` (uid 1000):
+
+   ```bash
+   docker volume create weddingplan-data
+   ```
+
+   ```bash
+   docker run --rm -v weddingplan-data:/data -v /path/ke/backend/prisma:/src:ro node:22-slim sh -c "cp /src/dev.db /data/wedding.db && chown -R 1000:1000 /data"
+   ```
+
+   Bila langkah ini dilewati, container membuat database baru yang kosong. Data lama tidak hilang, tetapi aplikasi tampak kosong dan pengguna bisa mendaftar ulang, sehingga datanya terbelah dua.
+3. Tandai baseline sebelum container dijalankan:
+
+   ```bash
+   docker run --rm -v weddingplan-data:/data weddingplan-api npx prisma migrate resolve --applied 0_init
+   ```
+
+4. Jalankan container seperti bagian 5, lalu cek data seperti Jalur A langkah 9–10.
+
+### Yang berubah bagi pengguna lama
+
+- Pengguna mungkin perlu login ulang satu kali, karena sesi sekarang hanya lewat cookie (token di localStorage tidak dipakai lagi). Password tidak berubah.
+- Login baru bertahan hanya bila dashboard dan API berada di satu domain induk dan lewat HTTPS. Versi lama masih bisa jalan lintas domain karena memakai token di localStorage; versi ini tidak.
+- Tautan undangan lama (`/invitation/<slug>`, `?to=Nama`, `/share/<slug>`) tetap berfungsi, dan dialihkan ke domain undangan bila `INVITATION_URL` diisi.
+
+### Rollback
+
+Hentikan service (atau container), kembalikan file backup ke `backend/prisma/dev.db`, `git checkout <commit lama>`, build ulang, lalu start. Jangan menjalankan versi lama di atas database yang sudah dimigrasikan.
 
 ## 5. Langkah deploy
 

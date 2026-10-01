@@ -3,7 +3,15 @@ import { isInvitationSite } from "./site.js";
 
 const MAX_NAME_PART_LENGTH = 40;
 
-const apiOrigin = (): string => API_BASE_URL.replace(/\/api\/?$/, "");
+// Alamat backend tanpa akhiran /api. Bila API dipasang relatif (VITE_API_URL="/api", backend di
+// balik reverse proxy pada domain yang sama), alamatnya dilengkapi dengan origin halaman agar
+// tautan yang disalin tetap utuh.
+export const resolveApiOrigin = (apiBaseUrl: string, pageOrigin: () => string): string => {
+  const base = apiBaseUrl.replace(/\/api\/?$/, "");
+  return /^https?:\/\//i.test(base) ? base : `${pageOrigin()}${base}`;
+};
+
+const apiOrigin = (): string => resolveApiOrigin(API_BASE_URL, () => window.location.origin);
 
 const guestSegment = (key?: string | null): string => (key ? `/${encodeURIComponent(key)}` : "");
 

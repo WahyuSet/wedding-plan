@@ -40,3 +40,6 @@ inveet-css.css
 backend/uploads/
 backend/tests/.uploads/
 *.db.bak
+
+# Catatan instance (domain, IP, keadaan server): jangan pernah di-commit, repo ini publik
+*.local.md
