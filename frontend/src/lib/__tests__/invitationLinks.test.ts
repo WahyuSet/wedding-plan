@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guestKey, invitationPath, publicInvitationUrl, shareInvitationUrl } from "../invitationLinks.js";
+import { guestKey, invitationPath, publicInvitationUrl, resolveApiOrigin, shareInvitationUrl } from "../invitationLinks.js";
 
 describe("guestKey", () => {
   it("menggabungkan slug nama dan kode", () => {
@@ -46,6 +46,14 @@ describe("tautan undangan", () => {
     expect(publicInvitationUrl("r-j", "jokowi-x7k2mq", domain)).toBe("https://undangan.com/r-j/jokowi-x7k2mq");
     expect(shareInvitationUrl("r-j", "jokowi-x7k2mq", domain)).toBe("https://undangan.com/r-j/jokowi-x7k2mq");
     expect(shareInvitationUrl("r-j", null, domain)).toBe("https://undangan.com/r-j");
+  });
+
+  it("alamat backend untuk tautan share: API absolut dipakai apa adanya, API relatif memakai origin halaman", () => {
+    const page = () => "https://wed.contoh.id";
+    expect(resolveApiOrigin("https://api.contoh.id/api", page)).toBe("https://api.contoh.id");
+    expect(resolveApiOrigin("http://localhost:5000/api/", page)).toBe("http://localhost:5000");
+    expect(resolveApiOrigin("/api", page)).toBe("https://wed.contoh.id");
+    expect(resolveApiOrigin("/backend/api", page)).toBe("https://wed.contoh.id/backend");
   });
 
   it("slug yang belum dirapikan di-encode agar tidak memecah URL", () => {
