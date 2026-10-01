@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { X, Check, Image as ImageIcon, Sparkles } from "lucide-react";
+import { X, Check, Image as ImageIcon } from "lucide-react";
 import {
-  ImagePresetItem,
+  type ImagePresetItem,
   MASTER_COVER_PRESETS,
   MASTER_GROOM_PRESETS,
   MASTER_BRIDE_PRESETS,

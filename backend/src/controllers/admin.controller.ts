@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma.js";
+import { invitationOrigin } from "../lib/invitationUrls.js";
 import { AuthRequest } from "../types/index.js";
+import { invalidateFlagCache } from "../middleware/flags.middleware.js";
+import { removeProfileUploads } from "./upload.controller.js";
 
 // 1. Get Global Platform Statistics
 export const getPlatformStats = async (_req: AuthRequest, res: Response): Promise<void> => {
@@ -122,6 +125,7 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
     // Check target user
     const targetUser = await prisma.user.findUnique({
       where: { id },
+      include: { weddingProfile: { select: { id: true } } },
     });
 
     if (!targetUser) {
@@ -145,6 +149,7 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
     await prisma.user.delete({
       where: { id },
     });
+    if (targetUser.weddingProfile) await removeProfileUploads(targetUser.weddingProfile.id);
 
     res.json({
       success: true,
@@ -197,6 +202,7 @@ export const updateSystemSetting = async (req: AuthRequest, res: Response): Prom
       where: { key },
       data: { value: String(value) },
     });
+    invalidateFlagCache();
 
     res.json({
       success: true,
@@ -228,6 +234,8 @@ export const getPublicSettings = async (_req: Request, res: Response): Promise<v
         digital_invitation: settingsMap["digital_invitation"] ?? true,
         user_registration: settingsMap["user_registration"] ?? true,
         system_maintenance: settingsMap["system_maintenance"] ?? false,
+        // Origin domain undangan; null berarti undangan dibuka di domain dashboard.
+        invitation_url: invitationOrigin(),
       },
     });
   } catch (error) {
@@ -237,6 +245,7 @@ export const getPublicSettings = async (_req: Request, res: Response): Promise<v
         digital_invitation: true,
         user_registration: true,
         system_maintenance: false,
+        invitation_url: invitationOrigin(),
       },
     });
   }

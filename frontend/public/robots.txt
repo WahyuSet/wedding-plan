@@ -3,7 +3,9 @@ User-agent: *
 Allow: /
 Allow: /login
 Allow: /register
-Allow: /invitation/
+
+# Undangan berisi data pribadi tamu dan mempelai: jangan diindeks
+Disallow: /invitation/
 
 # Disallow private user dashboards and data
 Disallow: /dashboard

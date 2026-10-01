@@ -1,8 +1,8 @@
 import { Response } from "express";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest } from "../types/index.js";
+import { ProfileRequest } from "../types/index.js";
 
-export const getDashboardSummary = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getDashboardSummary = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 

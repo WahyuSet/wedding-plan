@@ -1,796 +1,742 @@
-import React, { useState, useEffect } from "react";
-import {
-  Heart,
-  Calendar,
-  Clock,
-  MapPin,
-  Volume2,
-  VolumeX,
-  Send,
-  Gift,
-  Copy,
-  Check,
-  Instagram,
-  Mail,
-  X,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
-import { toast, Toaster } from "sonner";
-import { DigitalInvitation, LoveStoryItem, GalleryPhotoItem, BankAccountItem, InvitationRsvp } from "../../../types/index.js";
-import { formatDateIndo } from "../../../lib/utils.js";
-import { GoldDivider, CornerOrnament, MonogramFrame, CallaLilyAccent, StarField } from "./NoirCallaOrnaments.js";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CalendarPlus, Check, ChevronDown, Copy, Download, Instagram, Mail, MapPin, Send } from "lucide-react";
+import { toast } from "sonner";
+import type { DigitalInvitation, GalleryPhotoItem } from "../../../types/index.js";
+import { instagramHref, safeHref } from "../../../lib/safeUrl.js";
+import { downloadIcs, googleCalendarUrl } from "../shared/calendar.js";
+import type { CalendarEvent } from "../shared/calendar.js";
+import { formatEventDate, formatTimeRange, getEventStart } from "../shared/eventDate.js";
+import { Lightbox } from "../shared/Lightbox.js";
+import type { LightboxTone } from "../shared/Lightbox.js";
+import { longestWordLength } from "../shared/names.js";
+import { Reveal } from "../shared/Reveal.js";
+import { useCountdown } from "../shared/useCountdown.js";
+import { useRsvpForm } from "../shared/useRsvpForm.js";
+import type { AttendanceStatus } from "../shared/useRsvpForm.js";
+import type { InvitationThemeProps } from "../shared/types.js";
+import { CallaDivider, CallaLily, GoldDust, MonogramFrame, NoirCallaKeyframes } from "./NoirCallaOrnaments.js";
 
-interface NoirCallaThemeProps {
+const FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080B11]";
+const BTN_GOLD = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-[#D4AF37] px-6 text-sm font-semibold tracking-wide text-[#080B11] transition-colors hover:bg-[#C59F2D] disabled:cursor-not-allowed disabled:opacity-60 ${FOCUS}`;
+const BTN_GHOST = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-[#D4AF37]/40 px-5 text-sm font-medium text-[#F5F0E6] transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37] ${FOCUS}`;
+const CARD = "rounded-2xl border border-[#D4AF37]/20 bg-[#0F1420]";
+const FIELD = `min-h-[44px] w-full rounded-xl border border-[#D4AF37]/25 bg-[#0A0E17] px-4 text-base text-[#F5F0E6] placeholder:text-slate-400 ${FOCUS}`;
+const MUTED = "text-slate-300";
+const EYEBROW = "text-xs font-semibold uppercase tracking-[0.3em] text-[#D4AF37]";
+
+const nick = (value: string | null | undefined, fallback: string): string => value?.trim() || fallback;
+
+// Long single-word names must shrink instead of breaking mid-word on a phone.
+const nameSize = (...names: string[]): string => {
+  const longest = longestWordLength(...names);
+  if (longest > 13) return "text-3xl sm:text-5xl";
+  if (longest > 10) return "text-4xl sm:text-5xl";
+  return "text-5xl sm:text-6xl";
+};
+
+const SectionTitle: React.FC<{ eyebrow: string; title: string; id: string }> = ({ eyebrow, title, id }) => (
+  <div className="mb-10 text-center">
+    <p className={EYEBROW}>{eyebrow}</p>
+    <h2 id={id} className="mt-3 font-playfair text-3xl font-normal leading-tight text-[#F5F0E6] sm:text-4xl">
+      {title}
+    </h2>
+    <span aria-hidden="true" className="mx-auto mt-5 block h-px w-12 bg-[#D4AF37]/60" />
+  </div>
+);
+
+/* ------------------------------------------------------------------- hero */
+
+interface HeroProps {
   invitation: DigitalInvitation;
-  guestName?: string;
-  audioRef: React.RefObject<HTMLAudioElement | null>;
-  isPlayingMusic: boolean;
-  toggleMusic: () => void;
-  onRsvpSubmit: (payload: Record<string, unknown>) => Promise<unknown>;
-  isSubmittingRsvp: boolean;
+  guestName: string | null;
+  badge: string;
+  opened: boolean;
+  onOpen: () => void;
 }
 
-export const NoirCallaTheme: React.FC<NoirCallaThemeProps> = ({
+// One full-height photo serves as both the closed cover and the opening of the invitation.
+const Hero: React.FC<HeroProps> = ({ invitation, guestName, badge, opened, onOpen }) => {
+  const groom = nick(invitation.groomNickName, "Mempelai Pria");
+  const bride = nick(invitation.brideNickName, "Mempelai Wanita");
+  const date = formatEventDate(invitation.akadDate ?? invitation.resepsiDate);
+
+  return (
+    <section
+      aria-label="Sampul undangan"
+      className="relative flex min-h-[100dvh] flex-col justify-between overflow-hidden"
+    >
+      {invitation.coverPhotoUrl ? (
+        <img
+          src={invitation.coverPhotoUrl}
+          alt={`Foto ${groom} dan ${bride}`}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_25%,#1A2233_0%,#0D1117_50%,#080B11_100%)]" />
+      )}
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-[#080B11]/80 to-transparent" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-[72%] bg-gradient-to-t from-[#080B11] via-[#080B11]/85 to-transparent"
+      />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-3 border border-[#D4AF37]/30" />
+
+      <div className="relative px-8 pt-12 text-center">
+        <MonogramFrame className="h-16 w-16">
+          <span className="font-playfair text-lg text-[#D4AF37]">
+            {groom.charAt(0).toUpperCase()}&amp;{bride.charAt(0).toUpperCase()}
+          </span>
+        </MonogramFrame>
+        <p className={`mt-4 ${EYEBROW}`}>{badge}</p>
+        {!invitation.coverPhotoUrl && <CallaLily className="mx-auto mt-8 h-40 w-20" />}
+      </div>
+
+      <div className="relative px-8 pb-12 pt-10 text-center">
+        <p className="text-xs font-medium uppercase tracking-[0.3em] text-slate-200">
+          {invitation.title?.trim() || "The Wedding of"}
+        </p>
+        <h1
+          className={`mt-4 break-words font-playfair font-normal leading-[1.08] text-[#F5F0E6] ${nameSize(groom, bride)}`}
+        >
+          {groom}
+          <span className="my-1 block text-3xl italic text-[#D4AF37]">&amp;</span>
+          {bride}
+        </h1>
+        {date && <p className="mt-5 text-sm uppercase tracking-[0.2em] text-slate-200">{date}</p>}
+
+        {/* Fixed height keeps the names in place when the cover controls swap for the scroll cue. */}
+        <div className={`mt-8 ${guestName ? "min-h-[10rem]" : "min-h-[4.5rem]"}`}>
+          {opened ? (
+            <div className="nc-fade flex flex-col items-center gap-2 pt-4 text-slate-300">
+              <span className="text-xs uppercase tracking-[0.3em]">Gulir ke bawah</span>
+              <ChevronDown className="nc-float h-5 w-5 text-[#D4AF37]" aria-hidden="true" />
+            </div>
+          ) : (
+            <>
+              {guestName && (
+                <div className="mx-auto max-w-xs border-y border-[#D4AF37]/30 py-4">
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Kepada Yth.</p>
+                  <p className="mt-2 break-words font-playfair text-2xl text-[#F5F0E6]">{guestName}</p>
+                </div>
+              )}
+              <button type="button" onClick={onOpen} className={`${BTN_GOLD} mt-6 px-8`}>
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                Buka Undangan
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+/* --------------------------------------------------------------- countdown */
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+const Countdown: React.FC<{ invitation: DigitalInvitation }> = ({ invitation }) => {
+  const target = getEventStart(invitation);
+  const { days, hours, minutes, seconds, isOver } = useCountdown(target);
+  if (!target) return null;
+  const units: Array<[string, number]> = [
+    ["Hari", days],
+    ["Jam", hours],
+    ["Menit", minutes],
+    ["Detik", seconds],
+  ];
+  return (
+    <section aria-label="Hitung mundur" className="px-6 py-12 text-center">
+      <Reveal>
+        <p className={EYEBROW}>Menuju Hari Bahagia</p>
+        {isOver ? (
+          <p className="mt-6 font-playfair text-2xl text-[#F5F0E6]">Hari bahagia telah tiba.</p>
+        ) : (
+          <div className="mx-auto mt-8 grid max-w-sm grid-cols-4 divide-x divide-[#D4AF37]/25">
+            {units.map(([label, value]) => (
+              <div key={label} className="px-1">
+                <span className="block font-playfair text-4xl tabular-nums lining-nums text-[#F5F0E6] sm:text-5xl">
+                  {pad2(value)}
+                </span>
+                <span className={`mt-2 block text-xs uppercase tracking-[0.2em] ${MUTED}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Reveal>
+    </section>
+  );
+};
+
+/* ------------------------------------------------------------------ quote */
+
+const Quote: React.FC<{ text: string; source: string | null }> = ({ text, source }) => (
+  <section aria-label="Kutipan" className="px-8 py-12 text-center">
+    <Reveal>
+      <CallaLily className="mx-auto h-20 w-10" />
+      <blockquote className="mt-6 font-playfair text-lg italic leading-relaxed text-[#F5F0E6] sm:text-xl">
+        {text}
+      </blockquote>
+      {source?.trim() && <p className={`mt-5 ${EYEBROW}`}>{source}</p>}
+    </Reveal>
+  </section>
+);
+
+/* ---------------------------------------------------------------- mempelai */
+
+interface PersonProps {
+  role: "Putra" | "Putri";
+  fullName: string;
+  photoUrl: string | null;
+  father: string | null;
+  mother: string | null;
+  instagram: string | null;
+}
+
+const Person: React.FC<PersonProps> = ({ role, fullName, photoUrl, father, mother, instagram }) => {
+  const parents = [father?.trim(), mother?.trim()].filter(Boolean).join(" & ");
+  const igUrl = instagramHref(instagram);
+  return (
+    <Reveal className="flex flex-col items-center text-center">
+      <div className="relative w-[65%] max-w-[16rem]">
+        <span aria-hidden="true" className="absolute inset-0 translate-x-3 translate-y-3 border border-[#D4AF37]/50" />
+        <div className="relative aspect-[3/4] overflow-hidden bg-[#0F1420]">
+          {photoUrl ? (
+            <img src={photoUrl} alt={`Foto ${fullName}`} loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-[radial-gradient(ellipse_at_50%_30%,#1A2233,#0D1117)]">
+              <CallaLily className="h-36 w-[4.5rem]" />
+            </div>
+          )}
+        </div>
+      </div>
+      <h3 className="mt-10 max-w-full text-balance break-words font-playfair text-2xl font-normal leading-snug text-[#F5F0E6]">
+        {fullName}
+      </h3>
+      {parents && (
+        <p className={`mt-2 max-w-xs text-sm leading-relaxed ${MUTED}`}>
+          {role} dari <span className="text-[#F5F0E6]">{parents}</span>
+        </p>
+      )}
+      {igUrl && (
+        <a
+          href={igUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-full px-3 text-sm text-[#D4AF37] hover:text-[#F5F0E6] ${FOCUS}`}
+        >
+          <Instagram className="h-4 w-4" aria-hidden="true" />@{instagram?.trim().replace(/^@/, "")}
+        </a>
+      )}
+    </Reveal>
+  );
+};
+
+/* ------------------------------------------------------------------ events */
+
+interface EventInfo {
+  label: string;
+  date: string | null;
+  start: string | null;
+  end: string | null;
+  venue: string | null;
+  address: string | null;
+  mapUrl: string | null;
+}
+
+const EventCard: React.FC<{ event: EventInfo; invitation: DigitalInvitation; couple: string }> = ({
+  event,
   invitation,
-  guestName = "",
-  audioRef,
-  isPlayingMusic,
-  toggleMusic,
-  onRsvpSubmit,
-  isSubmittingRsvp,
+  couple,
 }) => {
-  const [isOpenEnvelope, setIsOpenEnvelope] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [rsvpName, setRsvpName] = useState(guestName);
-  const [attendance, setAttendance] = useState<"hadir" | "tidak_hadir" | "ragu">("hadir");
-  const [guestCount, setGuestCount] = useState(1);
-  const [message, setMessage] = useState("");
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  useEffect(() => {
-    const targetDate = new Date(invitation.akadDate || invitation.resepsiDate || new Date()).getTime();
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const diff = targetDate - now;
-      if (diff > 0) {
-        setTimeLeft({
-          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((diff / (1000 * 60)) % 60),
-          seconds: Math.floor((diff / 1000) % 60),
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
-    };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [invitation]);
-
-  const loveStories: LoveStoryItem[] = Array.isArray(invitation.loveStory)
-    ? invitation.loveStory
-    : typeof invitation.loveStory === "string"
-    ? JSON.parse(invitation.loveStory || "[]")
-    : [];
-
-  const gallery: GalleryPhotoItem[] = Array.isArray(invitation.galleryPhotos)
-    ? invitation.galleryPhotos
-    : typeof invitation.galleryPhotos === "string"
-    ? JSON.parse(invitation.galleryPhotos || "[]")
-    : [];
-
-  const bankAccounts: BankAccountItem[] = Array.isArray(invitation.bankAccounts)
-    ? invitation.bankAccounts
-    : typeof invitation.bankAccounts === "string"
-    ? JSON.parse(invitation.bankAccounts || "[]")
-    : [];
-
-  const rsvps: InvitationRsvp[] = invitation.rsvps || [];
-
-  const coverImage =
-    invitation.coverPhotoUrl ||
-    "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1600&auto=format&fit=crop&q=85";
-
-  const theme = {
-    bg: "bg-[#080B11]",
-    text: "text-slate-200",
-    textMuted: "text-slate-300",
-    textAccent: "text-[#D4AF37]",
-    headingFont: "font-serif",
-    cardBg: "bg-[#0F1420]/90 backdrop-blur-md",
-    cardBorder: "border-[#D4AF37]/25",
-    buttonPrimary: "bg-[#D4AF37] hover:bg-[#C59F2D] text-slate-950 font-bold",
-    badge: "bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20",
-    bodyTexture: "linear-gradient(180deg, #080B11 0%, #0D1117 50%, #080B11 100%)",
-    scrimOverlay: "bg-gradient-to-b from-[#080B11]/80 via-[#080B11]/50 to-[#080B11]/90",
+  const calendarEvent: CalendarEvent = {
+    title: `${event.label}: ${couple}`,
+    date: event.date,
+    startTime: event.start,
+    endTime: event.end,
+    timezone: invitation.timezone,
+    location: [event.venue, event.address].filter(Boolean).join(", "),
+    description: `Undangan pernikahan ${couple}`,
   };
+  const calendarUrl = googleCalendarUrl(calendarEvent);
+  const map = safeHref(event.mapUrl);
+  const date = formatEventDate(event.date);
 
-  const handleOpenInvitation = () => {
-    setIsOpenEnvelope(true);
-    if (invitation.bgMusicUrl && audioRef.current) {
-      audioRef.current.play().catch(() => {});
+  return (
+    <Reveal>
+      <article className={`p-6 text-center ${CARD}`}>
+        <h3 className={EYEBROW}>{event.label}</h3>
+        {date && (
+          <>
+            <p className="mt-4 font-playfair text-2xl leading-snug text-[#F5F0E6]">{date}</p>
+            <p className={`mt-1 text-sm ${MUTED}`}>{formatTimeRange(event.start, event.end, invitation.timezone)}</p>
+          </>
+        )}
+        {(event.venue || event.address) && (
+          <div className="mt-5 border-t border-[#D4AF37]/15 pt-5">
+            {event.venue && <p className="font-semibold text-[#F5F0E6]">{event.venue}</p>}
+            {event.address && <p className={`mt-1 text-sm leading-relaxed ${MUTED}`}>{event.address}</p>}
+          </div>
+        )}
+        {(map || calendarUrl) && (
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            {map && (
+              <a href={map} target="_blank" rel="noopener noreferrer" className={BTN_GOLD}>
+                <MapPin className="h-4 w-4" aria-hidden="true" />
+                Buka Peta
+              </a>
+            )}
+            {calendarUrl && (
+              <>
+                <a href={calendarUrl} target="_blank" rel="noopener noreferrer" className={BTN_GHOST}>
+                  <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+                  Simpan ke Kalender
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (downloadIcs(calendarEvent)) toast.success("Kalender .ics berhasil diunduh");
+                  }}
+                  className={BTN_GHOST}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Unduh .ics
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </article>
+    </Reveal>
+  );
+};
+
+/* -------------------------------------------------------------- love story */
+
+const LoveStory: React.FC<{ items: Array<{ year: string; title: string; story: string }> }> = ({ items }) => (
+  <section aria-labelledby="nc-story" className="px-6 py-12">
+    <SectionTitle eyebrow="Perjalanan" title="Kisah Kami" id="nc-story" />
+    <ol>
+      {items.map((item, i) => (
+        <li key={`${item.year}-${i}`} className="text-center">
+          {i > 0 && <span aria-hidden="true" className="mx-auto my-8 block h-10 w-px bg-[#D4AF37]/40" />}
+          <Reveal>
+            <p className="font-playfair text-3xl italic lining-nums text-[#D4AF37]">{item.year}</p>
+            <h3 className="mt-2 font-playfair text-xl font-normal text-[#F5F0E6]">{item.title}</h3>
+            <p className={`mx-auto mt-2 max-w-sm text-sm leading-relaxed ${MUTED}`}>{item.story}</p>
+          </Reveal>
+        </li>
+      ))}
+    </ol>
+  </section>
+);
+
+/* ----------------------------------------------------------------- gallery */
+
+const LIGHTBOX_TONE: LightboxTone = {
+  control: `bg-[#0F1420] text-[#F5F0E6] hover:text-[#D4AF37] ${FOCUS}`,
+  caption: "text-slate-200",
+  backdrop: "backdrop:bg-[#080B11]/95",
+};
+
+const Gallery: React.FC<{ items: GalleryPhotoItem[] }> = ({ items }) => {
+  const [open, setOpen] = useState<number | null>(null);
+  const close = useCallback(() => setOpen(null), []);
+  return (
+    <section aria-labelledby="nc-gallery" className="px-6 py-12">
+      <SectionTitle eyebrow="Momen" title="Galeri" id="nc-gallery" />
+      <div className="grid grid-cols-2 gap-2">
+        {items.map((item, i) => (
+          <button
+            key={`${item.url}-${i}`}
+            type="button"
+            onClick={() => setOpen(i)}
+            aria-label={`Buka foto ${i + 1}${item.caption ? `: ${item.caption}` : ""}`}
+            className={`overflow-hidden bg-[#0F1420] ${FOCUS} ${
+              i % 5 === 0 ? "col-span-2 aspect-[4/3]" : "aspect-[3/4]"
+            }`}
+          >
+            <img
+              src={item.url}
+              alt={item.caption || `Foto galeri ${i + 1}`}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-500 hover:scale-105 motion-reduce:transition-none"
+            />
+          </button>
+        ))}
+      </div>
+      {open !== null && <Lightbox items={items} index={open} tone={LIGHTBOX_TONE} onClose={close} onChange={setOpen} />}
+    </section>
+  );
+};
+
+/* -------------------------------------------------------------------- gift */
+
+interface GiftProps {
+  intro: string;
+  accounts: InvitationThemeProps["data"]["bankAccounts"];
+  address: string | null;
+}
+
+const Gift: React.FC<GiftProps> = ({ intro, accounts, address }) => {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = async (number: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(number);
+      setCopied(key);
+      toast.success("Nomor rekening tersalin", { description: number });
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 2500);
+    } catch {
+      toast.error("Tidak dapat menyalin. Salin nomor secara manual.");
     }
-  };
-
-  const copyAccount = (accNumber: string, idx: number) => {
-    navigator.clipboard.writeText(accNumber);
-    setCopiedIndex(idx);
-    toast.success("Nomor Rekening Berhasil Disalin!", { description: accNumber });
-    setTimeout(() => setCopiedIndex(null), 2500);
-  };
-
-  // Scroll reveal via IntersectionObserver
-  useEffect(() => {
-    if (!isOpenEnvelope) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("animate-fade-in-up");
-            entry.target.classList.remove("opacity-0", "translate-y-6");
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.15 }
-    );
-    const elements = document.querySelectorAll("[data-animate]");
-    elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [isOpenEnvelope]);
-
-  const handleRsvpSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rsvpName.trim()) {
-      toast.error("Silakan isi nama Anda!");
-      return;
-    }
-    onRsvpSubmit({
-      guestName: rsvpName,
-      attendanceStatus: attendance,
-      guestCount: Number(guestCount),
-      message,
-    });
   };
 
   return (
-    <div
-      className={`min-h-[100dvh] ${theme.bg} ${theme.text} selection:bg-amber-400/30 transition-colors duration-500 relative overflow-x-hidden`}
-      style={{ background: theme.bodyTexture }}
-    >
-      <Toaster position="top-center" richColors />
-
-      {/* Star Field Background */}
-      <StarField />
-
-      {/* ──────────────────────────────────────────────────────── */}
-      {/* 1. COVER / ENVELOPE OPENING SCREEN                       */}
-      {/* ──────────────────────────────────────────────────────── */}
-      {!isOpenEnvelope && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 sm:p-10 select-none overflow-hidden">
-          {/* Full-bleed Background Photography */}
-          <div
-            className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-105"
-            style={{ backgroundImage: `url("${coverImage}")` }}
-          />
-
-          {/* Scrim Overlay Gradient for Cinematic Legibility */}
-          <div className={`absolute inset-0 ${theme.scrimOverlay} backdrop-blur-xs`} />
-
-          {/* Corner Ornaments */}
-          <CornerOrnament position="tl" className="top-4 left-4 z-20" />
-          <CornerOrnament position="tr" className="top-4 right-4 z-20" />
-          <CornerOrnament position="bl" className="bottom-4 left-4 z-20" />
-          <CornerOrnament position="br" className="bottom-4 right-4 z-20" />
-
-          {/* Delicate Botanical Border Frame */}
-          <div className="absolute inset-4 sm:inset-6 border border-[#D4AF37]/20 rounded-3xl pointer-events-none z-10" />
-
-          {/* Top Header */}
-          <div className="relative z-20 pt-8 space-y-2 animate-fade-in text-center">
-            <span className={`inline-block px-3.5 py-1 rounded-full text-[10px] uppercase tracking-[0.25em] font-bold ${theme.badge}`}>
-              The Wedding Invitation
-            </span>
-            <p className={`text-xs tracking-widest uppercase font-medium ${theme.textMuted || "text-slate-300"}`}>
-              {invitation.title || "The Wedding of"}
-            </p>
-          </div>
-
-          {/* Couple Monogram / Names */}
-          <div className="relative z-20 my-auto space-y-5 animate-scale-up max-w-md text-center">
-            {/* Monogram Seal */}
-            <MonogramFrame className="w-24 h-24 mx-auto">
-              <span className={`text-3xl font-serif font-black ${theme.textAccent}`}>
-                {invitation.groomNickName?.charAt(0) || "P"}&{invitation.brideNickName?.charAt(0) || "W"}
-              </span>
-            </MonogramFrame>
-
-            <div className="space-y-1">
-              <h1 className={`text-3xl sm:text-4xl font-extrabold ${theme.headingFont} tracking-tight leading-tight`}>
-                {invitation.groomNickName || "Mempelai Pria"} & {invitation.brideNickName || "Mempelai Wanita"}
-              </h1>
-              <p className={`text-xs font-medium ${theme.textMuted || "text-slate-300"}`}>
-                {invitation.akadDate ? formatDateIndo(invitation.akadDate) : "Tanggal Bahagia"}
-              </p>
-            </div>
-
-            {/* Guest Personalization Card */}
-            {guestName && (
-              <div className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} shadow-2xl space-y-1 max-w-xs mx-auto`}>
-                <p className={`text-[11px] ${theme.textMuted || "text-slate-300"}`}>Kepada Yth. Bapak/Ibu/Saudara/i:</p>
-                <p className={`text-base font-extrabold font-serif ${theme.textAccent}`}>{guestName}</p>
-                <p className={`text-[10px] ${theme.textMuted || "text-slate-300"} opacity-60`}>Di Tempat</p>
+    <section aria-labelledby="nc-gift" className="px-6 py-12">
+      <SectionTitle eyebrow="Hadiah" title="Tanda Kasih" id="nc-gift" />
+      <p className={`mx-auto -mt-4 mb-8 max-w-sm text-center text-sm leading-relaxed ${MUTED}`}>{intro}</p>
+      <div className="space-y-4">
+        {accounts.map((acc, i) => {
+          const key = `${acc.bankName}-${acc.accountNumber}-${i}`;
+          return (
+            <Reveal key={key}>
+              <div className={`p-6 text-center ${CARD}`}>
+                <p className={EYEBROW}>{acc.bankName}</p>
+                <p className="mt-3 break-all font-playfair text-2xl tabular-nums lining-nums tracking-wider text-[#F5F0E6]">
+                  {acc.accountNumber}
+                </p>
+                <p className={`mt-1 text-sm ${MUTED}`}>a.n. {acc.accountHolder}</p>
+                {acc.qrCodeUrl && (
+                  <img
+                    src={acc.qrCodeUrl}
+                    alt={`Kode QR ${acc.bankName}`}
+                    loading="lazy"
+                    className="mx-auto mt-4 h-28 w-28 rounded-lg bg-white p-1"
+                  />
+                )}
+                <button type="button" onClick={() => void copy(acc.accountNumber, key)} className={`${BTN_GHOST} mt-5`}>
+                  {copied === key ? (
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {copied === key ? "Tersalin" : "Salin Nomor Rekening"}
+                </button>
               </div>
-            )}
-          </div>
+            </Reveal>
+          );
+        })}
+        {address && (
+          <Reveal>
+            <div className={`p-6 text-center ${CARD}`}>
+              <p className={EYEBROW}>Alamat Kirim Kado</p>
+              <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[#F5F0E6]">{address}</p>
+            </div>
+          </Reveal>
+        )}
+      </div>
+    </section>
+  );
+};
 
-          {/* Open Button */}
-          <div className="relative z-20 pb-8 animate-fade-in text-center">
-            <button
-              onClick={handleOpenInvitation}
-              className={`px-8 py-3.5 rounded-full text-xs font-extrabold tracking-wider uppercase transition-all duration-300 shadow-[0_0_20px_rgba(212,175,55,0.3)] flex items-center gap-2.5 mx-auto active:scale-95 ${theme.buttonPrimary}`}
-            >
-              <Mail className="w-4 h-4" />
-              <span>Buka Undangan</span>
-            </button>
-            <p className={`text-[10px] mt-3 font-medium ${theme.textMuted || "text-slate-300"} opacity-60`}>*Sentuh untuk membuka dan memutar alunan musik</p>
+/* -------------------------------------------------------------------- rsvp */
+
+const ATTENDANCE: Array<{ value: AttendanceStatus; label: string }> = [
+  { value: "hadir", label: "Hadir" },
+  { value: "tidak_hadir", label: "Berhalangan" },
+  { value: "ragu", label: "Ragu-ragu" },
+];
+
+const STATUS_STYLE: Record<AttendanceStatus, string> = {
+  hadir: "text-emerald-300",
+  tidak_hadir: "text-rose-300",
+  ragu: "text-amber-300",
+};
+
+const formatWishDate = (iso: string): string => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(d);
+};
+
+const Rsvp: React.FC<Pick<InvitationThemeProps, "data" | "guest" | "rsvp">> = ({ data, guest, rsvp }) => {
+  const form = useRsvpForm({ initialName: guest?.name, onSubmit: rsvp.submit });
+  const labelCls = "mb-2 block text-sm font-medium text-[#F5F0E6]";
+
+  return (
+    <section aria-labelledby="nc-rsvp" className="px-6 py-12">
+      <SectionTitle eyebrow="RSVP" title="Buku Tamu & Doa Restu" id="nc-rsvp" />
+      <form onSubmit={(e) => void form.handleRsvpSubmit(e)} className={`space-y-5 p-6 ${CARD}`}>
+        <div>
+          <label htmlFor="nc-rsvp-name" className={labelCls}>
+            Nama Anda
+          </label>
+          <input
+            id="nc-rsvp-name"
+            type="text"
+            autoComplete="name"
+            required
+            maxLength={100}
+            value={form.rsvpName}
+            onChange={(e) => form.setRsvpName(e.target.value)}
+            placeholder="Nama lengkap Anda"
+            className={FIELD}
+          />
+        </div>
+
+        <div role="group" aria-labelledby="nc-rsvp-att">
+          <span id="nc-rsvp-att" className={labelCls}>
+            Konfirmasi Kehadiran
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {ATTENDANCE.map((opt) => {
+              const active = form.attendance === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => form.setAttendance(opt.value)}
+                  className={`min-h-[44px] rounded-xl border px-1 text-sm font-medium transition-colors ${FOCUS} ${
+                    active
+                      ? "border-[#D4AF37] bg-[#D4AF37] text-[#080B11]"
+                      : "border-[#D4AF37]/25 bg-[#0A0E17] text-[#F5F0E6] hover:border-[#D4AF37]/70"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
 
-      {/* ──────────────────────────────────────────────────────── */}
-      {/* 2. FLOATING MUSIC CONTROLLER                             */}
-      {/* ──────────────────────────────────────────────────────── */}
-      {isOpenEnvelope && invitation.bgMusicUrl && (
-        <button
-          onClick={toggleMusic}
-          className={`fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full shadow-2xl flex items-center justify-center border transition-transform active:scale-95 ${theme.cardBg} ${theme.cardBorder} ${theme.textAccent}`}
-          title={isPlayingMusic ? "Jeda Musik" : "Putar Musik"}
-        >
-          {isPlayingMusic ? (
-            <div className="relative flex items-center justify-center">
-              <Volume2 className="w-5 h-5 animate-pulse" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-            </div>
-          ) : (
-            <VolumeX className="w-5 h-5 opacity-50" />
-          )}
+        {form.attendance === "hadir" && (
+          <div>
+            <label htmlFor="nc-rsvp-count" className={labelCls}>
+              Jumlah Tamu
+            </label>
+            <select
+              id="nc-rsvp-count"
+              value={form.guestCount}
+              onChange={(e) => form.setGuestCount(Number(e.target.value))}
+              className={FIELD}
+            >
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {n} orang
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="nc-rsvp-msg" className={labelCls}>
+            Ucapan &amp; Doa Restu
+          </label>
+          <textarea
+            id="nc-rsvp-msg"
+            rows={4}
+            maxLength={500}
+            value={form.message}
+            onChange={(e) => form.setMessage(e.target.value)}
+            placeholder="Tulis doa dan ucapan untuk kedua mempelai"
+            className={`${FIELD} resize-none py-3`}
+          />
+        </div>
+
+        <button type="submit" disabled={rsvp.isPending} className={`${BTN_GOLD} w-full`}>
+          <Send className="h-4 w-4" aria-hidden="true" />
+          {rsvp.isPending ? "Mengirim..." : "Kirim Konfirmasi & Ucapan"}
         </button>
-      )}
+      </form>
 
-      {/* ──────────────────────────────────────────────────────── */}
-      {/* 3. MAIN INVITATION CONTENT                                */}
-      {/* ──────────────────────────────────────────────────────── */}
-      <main className="max-w-xl mx-auto px-4 sm:px-5 py-12 space-y-12 sm:space-y-16 relative z-10">
-
-        {/* Section 1: Hero Cover */}
-        <section className="text-center space-y-6 pt-4 opacity-0 translate-y-6" data-animate>
-          <div className="flex justify-center">
-            <CallaLilyAccent className="opacity-40" />
-          </div>
-          <div className="space-y-2">
-            <span className={`inline-block px-3.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.25em] ${theme.badge}`}>
-              Walimatul 'Ursy
-            </span>
-            <p className={`text-xs uppercase tracking-widest font-medium ${theme.textMuted || "text-slate-300"}`}>
-              {invitation.title || "The Wedding Of"}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <h1 className={`text-4xl sm:text-5xl font-black ${theme.headingFont} tracking-tight`}>
-              {invitation.groomNickName || "Mempelai Pria"}
-            </h1>
-            <p className={`text-2xl font-serif italic ${theme.textAccent}`}>&</p>
-            <h1 className={`text-4xl sm:text-5xl font-black ${theme.headingFont} tracking-tight`}>
-              {invitation.brideNickName || "Mempelai Wanita"}
-            </h1>
-          </div>
-
-          <GoldDivider />
-
-          <p className={`text-xs flex items-center justify-center gap-1.5 font-medium ${theme.textMuted || "text-slate-300"}`}>
-            <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" />
-            {invitation.akadDate ? formatDateIndo(invitation.akadDate) : "Tanggal Bahagia"}
-          </p>
-
-          {/* Countdown Clock */}
-          <div className={`p-4 sm:p-5 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} shadow-lg max-w-sm mx-auto`}>
-            <p className={`text-[10px] uppercase font-bold tracking-widest mb-3 ${theme.textMuted || "text-slate-300"}`}>Menghitung Hari</p>
-            <div className="grid grid-cols-4 gap-2 text-center">
-              {[
-                { label: "Hari", val: timeLeft.days },
-                { label: "Jam", val: timeLeft.hours },
-                { label: "Menit", val: timeLeft.minutes },
-                { label: "Detik", val: timeLeft.seconds },
-              ].map((item, i) => (
-                <div key={i} className="p-2.5 rounded-2xl bg-black/20 border border-[#D4AF37]/10">
-                  <span className={`block text-xl sm:text-2xl font-black tabular-nums ${theme.textAccent} drop-shadow-[0_0_6px_rgba(212,175,55,0.4)]`}>
-                    {String(item.val).padStart(2, "0")}
-                  </span>
-                  <span className={`text-[9px] uppercase tracking-wider ${theme.textMuted || "text-slate-300"}`}>{item.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Section 2: Sacred Quote */}
-        {invitation.openingQuote && (
-          <section className="text-center space-y-4 px-2 sm:px-4 opacity-0 translate-y-6" data-animate>
-            <GoldDivider />
-            <p className={`text-sm sm:text-base leading-relaxed italic max-w-md mx-auto ${theme.textMuted || "text-slate-300"}`}>
-              "{invitation.openingQuote}"
-            </p>
-            {invitation.quoteSource && (
-              <p className={`text-[11px] font-bold tracking-wider uppercase ${theme.textAccent}`}>
-                — {invitation.quoteSource}
-              </p>
-            )}
-            <GoldDivider />
-          </section>
-        )}
-
-        {/* Section 3: Groom & Bride Profiles */}
-        <section className="space-y-8 opacity-0 translate-y-6" data-animate>
-          <div className="text-center space-y-2">
-            <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Kedua Mempelai</h2>
-            <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>Dengan memohon rahmat dan ridho Allah SWT</p>
-            <GoldDivider className="mt-3" />
-          </div>
-
-          {/* Groom Card */}
-          <div className={`p-4 sm:p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} text-center space-y-4 shadow-lg`}>
-            {invitation.groomPhotoUrl ? (
-              <img
-                src={invitation.groomPhotoUrl}
-                alt="Groom"
-                className="w-28 h-28 rounded-full object-cover mx-auto border-2 border-[#D4AF37]/60 p-1 shadow-lg"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-[#D4AF37]/10 border-2 border-[#D4AF37]/40 flex items-center justify-center mx-auto">
-                <span className="text-xl font-serif font-bold text-[#D4AF37]">{invitation.groomFullName?.charAt(0) || "P"}</span>
+      <h3 className="mt-12 text-center font-playfair text-2xl font-normal text-[#F5F0E6]">
+        Doa Restu dari Para Tamu ({data.rsvpTotal})
+      </h3>
+      {data.rsvps.length === 0 ? (
+        <p className={`mt-4 text-center text-sm ${MUTED}`}>Jadilah yang pertama memberikan doa restu.</p>
+      ) : (
+        <ul className="mt-4 max-h-[28rem] divide-y divide-[#D4AF37]/15 overflow-y-auto pr-1">
+          {data.rsvps.map((r) => (
+            <li key={r.id} className="py-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <p className="break-words font-semibold text-[#F5F0E6]">{r.guestName}</p>
+                <span className={`text-xs font-medium ${STATUS_STYLE[r.attendanceStatus]}`}>
+                  {r.attendanceStatus === "hadir"
+                    ? `Hadir (${r.guestCount} orang)`
+                    : r.attendanceStatus === "tidak_hadir"
+                    ? "Berhalangan"
+                    : "Ragu-ragu"}
+                </span>
               </div>
-            )}
-            <div className="space-y-1">
-              <h3 className={`text-lg font-bold ${theme.headingFont}`}>
-                {invitation.groomFullName || "Mempelai Pria"}
-              </h3>
-              <p className={`text-xs ${theme.textMuted || "text-slate-300"} opacity-80`}>
-                Putra dari {invitation.groomFather || "Bpk. Ayah"} & {invitation.groomMother || "Ibu. Ibu"}
-              </p>
-            </div>
-            {invitation.groomInstagram && (
-              <a
-                href={`https://instagram.com/${invitation.groomInstagram.replace("@", "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${theme.badge}`}
-              >
-                <Instagram className="w-3.5 h-3.5" />
-                <span>{invitation.groomInstagram}</span>
-              </a>
-            )}
-          </div>
-
-          <div className="text-center flex items-center justify-center gap-3 py-2">
-            <GoldDivider />
-          </div>
-          {/* Bride Card */}
-          <div className={`p-4 sm:p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} text-center space-y-4 shadow-lg`}>
-            {invitation.bridePhotoUrl ? (
-              <img
-                src={invitation.bridePhotoUrl}
-                alt="Bride"
-                className="w-28 h-28 rounded-full object-cover mx-auto border-2 border-[#D4AF37]/60 p-1 shadow-lg"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-[#D4AF37]/10 border-2 border-[#D4AF37]/40 flex items-center justify-center mx-auto">
-                <span className="text-xl font-serif font-bold text-[#D4AF37]">{invitation.brideFullName?.charAt(0) || "W"}</span>
-              </div>
-            )}
-            <div className="space-y-1">
-              <h3 className={`text-lg font-bold ${theme.headingFont}`}>
-                {invitation.brideFullName || "Mempelai Wanita"}
-              </h3>
-              <p className={`text-xs ${theme.textMuted || "text-slate-300"} opacity-80`}>
-                Putri dari {invitation.brideFather || "Bpk. Ayah"} & {invitation.brideMother || "Ibu. Ibu"}
-              </p>
-            </div>
-            {invitation.brideInstagram && (
-              <a
-                href={`https://instagram.com/${invitation.brideInstagram.replace("@", "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${theme.badge}`}
-              >
-                <Instagram className="w-3.5 h-3.5" />
-                <span>{invitation.brideInstagram}</span>
-              </a>
-            )}
-          </div>
-        </section>
-
-        {/* Section 4: Event Details (Akad & Resepsi) */}
-        <section className="space-y-6 opacity-0 translate-y-6" data-animate>
-          <div className="text-center space-y-2">
-            <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Rangkaian Acara</h2>
-            <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>Waktu & Tempat Pelaksanaan</p>
-            <GoldDivider className="mt-3" />
-          </div>
-
-          {/* Akad */}
-          <div className={`p-4 sm:p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} space-y-4 shadow-lg`}>
-            <div className="flex items-center justify-between">
-              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${theme.badge}`}>
-                Akad Nikah
-              </span>
-              <Clock className="w-4 h-4 text-[#D4AF37]/70" />
-            </div>
-
-            <div className="space-y-2">
-              <h3 className={`text-base sm:text-lg font-bold ${theme.headingFont}`}>
-                {invitation.akadDate ? formatDateIndo(invitation.akadDate) : "Tanggal Akad"}
-              </h3>
-              <p className={`text-xs font-semibold flex items-center gap-2 ${theme.textMuted || "text-slate-300"}`}>
-                <span>Pukul {invitation.akadStartTime || "08:00"} - {invitation.akadEndTime || "Selesai"} WIB</span>
-              </p>
-            </div>
-
-            <div className="space-y-1 pt-2 border-t border-[#D4AF37]/15">
-              <p className="text-xs font-bold text-slate-100">{invitation.akadVenueName || "Nama Tempat"}</p>
-              <p className={`text-xs leading-relaxed ${theme.textMuted || "text-slate-300"}`}>{invitation.akadAddress || "Alamat lengkap"}</p>
-            </div>
-
-            {invitation.akadMapUrl && (
-              <a href={invitation.akadMapUrl} target="_blank" rel="noopener noreferrer" className="block">
-                <button className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-[#D4AF37]/30 text-[#D4AF37] hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/5 transition-colors">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>Petunjuk Arah Google Maps</span>
-                </button>
-              </a>
-            )}
-          </div>
-
-          {/* Resepsi */}
-          <div className={`p-4 sm:p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} space-y-4 shadow-lg`}>
-            <div className="flex items-center justify-between">
-              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${theme.badge}`}>
-                Resepsi Pernikahan
-              </span>
-              <Clock className="w-4 h-4 text-[#D4AF37]/70" />
-            </div>
-
-            <div className="space-y-2">
-              <h3 className={`text-base sm:text-lg font-bold ${theme.headingFont}`}>
-                {invitation.resepsiDate ? formatDateIndo(invitation.resepsiDate) : "Tanggal Resepsi"}
-              </h3>
-              <p className={`text-xs font-semibold flex items-center gap-2 ${theme.textMuted || "text-slate-300"}`}>
-                <span>Pukul {invitation.resepsiStartTime || "11:00"} - {invitation.resepsiEndTime || "Selesai"} WIB</span>
-              </p>
-            </div>
-
-            <div className="space-y-1 pt-2 border-t border-[#D4AF37]/15">
-              <p className="text-xs font-bold text-slate-100">{invitation.resepsiVenueName || "Nama Tempat"}</p>
-              <p className={`text-xs leading-relaxed ${theme.textMuted || "text-slate-300"}`}>{invitation.resepsiAddress || "Alamat lengkap"}</p>
-            </div>
-
-            {invitation.resepsiMapUrl && (
-              <a href={invitation.resepsiMapUrl} target="_blank" rel="noopener noreferrer" className="block">
-                <button className="w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-[#D4AF37]/30 text-[#D4AF37] hover:border-[#D4AF37]/40 hover:bg-[#D4AF37]/5 transition-colors">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>Petunjuk Arah Google Maps</span>
-                </button>
-              </a>
-            )}
-          </div>
-        </section>
-
-        {/* Section 5: Love Story Timeline */}
-        {loveStories.length > 0 && (
-          <section className="space-y-6 opacity-0 translate-y-6" data-animate>
-            <div className="text-center space-y-2">
-              <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Kisah Kasih Kami</h2>
-              <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>Sebuah perjalanan menuju ikatan suci</p>
-              <GoldDivider className="mt-3" />
-            </div>
-
-            <div className="space-y-4 relative before:absolute before:left-4 sm:before:left-6 before:top-2 before:bottom-2 before:w-px before:bg-[#D4AF37]/20">
-              {loveStories.map((story, idx) => (
-                <div key={idx} className="relative pl-10 sm:pl-14">
-                  <span className="absolute left-[18px] sm:left-[22px] top-2 w-3 h-3 rounded-full bg-[#D4AF37] border-2 border-[#080B11] shadow-sm shadow-[#D4AF37]/30" />
-                  <div className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} border-l-2 border-l-[#D4AF37]/40`}>
-                    <span className={`text-[10px] font-extrabold uppercase tracking-wider ${theme.textAccent}`}>
-                      {story.year}
-                    </span>
-                    <h4 className={`text-sm font-bold mt-0.5 ${theme.headingFont}`}>{story.title}</h4>
-                    <p className={`text-xs leading-relaxed mt-1 ${theme.textMuted || "text-slate-300"}`}>{story.story}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Section 6: Photo Gallery */}
-        {gallery.length > 0 && (
-          <section className="space-y-6 opacity-0 translate-y-6" data-animate>
-            <div className="text-center space-y-2">
-              <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Momen Bahagia</h2>
-              <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>Galeri kenangan perjalanan kami berdua</p>
-              <GoldDivider className="mt-3" />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-              {gallery.map((photo, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setLightboxIndex(idx)}
-                  className={`rounded-2xl overflow-hidden border ${theme.cardBorder} shadow-sm group aspect-square cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/50 transition-transform duration-300 hover:scale-[1.02]`}
-                >
-                  <img
-                    src={photo.url}
-                    alt={photo.caption || "Gallery"}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Gallery Lightbox */}
-        {lightboxIndex !== null && (
-          <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4" onClick={() => setLightboxIndex(null)}>
-            <button
-              onClick={() => setLightboxIndex(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors z-10"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(Math.max(0, lightboxIndex - 1)); }}
-              className="absolute left-2 sm:left-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors disabled:opacity-30 z-10"
-              disabled={lightboxIndex === 0}
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <img
-              src={gallery[lightboxIndex].url}
-              alt={gallery[lightboxIndex].caption || "Gallery"}
-              className="max-w-full max-h-[85vh] object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(Math.min(gallery.length - 1, lightboxIndex + 1)); }}
-              className="absolute right-2 sm:right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors disabled:opacity-30 z-10"
-              disabled={lightboxIndex === gallery.length - 1}
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-            {gallery[lightboxIndex].caption && (
-              <p className="absolute bottom-6 text-[11px] sm:text-sm text-white/80 text-center max-w-md px-2.5">{gallery[lightboxIndex].caption}</p>
-            )}
-          </div>
-        )}
-
-        {/* Section 7: Digital Gift / Amplop Digital */}
-        {bankAccounts.length > 0 && (
-          <section className="space-y-6 opacity-0 translate-y-6" data-animate>
-            <div className="text-center space-y-2">
-              <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Tanda Kasih (Wedding Gift)</h2>
-              <p className={`text-xs ${theme.textMuted || "text-slate-300"} max-w-sm mx-auto`}>
-                Doa restu Anda merupakan karunia terindah bagi kami. Namun jika Anda ingin memberikan tanda kasih, Anda dapat menyalurkannya melalui:
-              </p>
-              <GoldDivider className="mt-3" />
-            </div>
-
-            <div className="space-y-3">
-              {bankAccounts.map((acc, idx) => (
-                <div key={idx} className={`p-5 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} space-y-3 shadow-lg`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase tracking-wider ${theme.badge}`}>
-                      {acc.bankName}
-                    </span>
-                    <Gift className="w-4 h-4 text-[#D4AF37]/60" />
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <p className={`text-[10px] uppercase tracking-wider ${theme.textMuted || "text-slate-300"}`}>Nomor Rekening</p>
-                    <p className={`text-lg sm:text-xl font-bold font-mono tracking-widest break-all ${theme.textAccent}`}>
-                      {acc.accountNumber}
-                    </p>
-                    <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>a.n {acc.accountHolder}</p>
-                  </div>
-
-                  <button
-                    onClick={() => copyAccount(acc.accountNumber, idx)}
-                    className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-colors ${copiedIndex === idx ? "border-emerald-500/40 bg-emerald-500/10" : "border-[#D4AF37]/30 text-[#D4AF37] hover:bg-[#D4AF37]/10"}`}
-                  >
-                    {copiedIndex === idx ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">Tersalin ke Clipboard</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Salin Nomor Rekening</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ))}
-
-              {invitation.giftAddress && (
-                <div className={`p-5 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} space-y-2 shadow-lg text-center`}>
-                  <p className={`text-[11px] font-bold uppercase tracking-wider ${theme.textMuted || "text-slate-300"}`}>Alamat Kirim Kado Fisik</p>
-                  <p className={`text-xs leading-relaxed max-w-sm mx-auto ${theme.textMuted || "text-slate-300"}`}>{invitation.giftAddress}</p>
-                </div>
+              {r.message?.trim() && (
+                <p className="mt-2 whitespace-pre-line break-words font-playfair text-base italic leading-relaxed text-slate-200">
+                  {r.message}
+                </p>
               )}
-            </div>
+              {formatWishDate(r.createdAt) && <p className="mt-2 text-xs text-slate-400">{formatWishDate(r.createdAt)}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+};
+
+/* ------------------------------------------------------------------- music */
+
+const MusicButton: React.FC<{ isPlaying: boolean; onToggle: () => void }> = ({ isPlaying, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-label={isPlaying ? "Jeda musik latar" : "Putar musik latar"}
+    className={`fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-[#D4AF37]/60 bg-[#0F1420] text-[#D4AF37] shadow-lg shadow-black/40 hover:bg-[#1A2233] ${FOCUS}`}
+  >
+    <span className="flex h-5 items-end gap-[3px]" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`w-[3px] rounded-full bg-current ${isPlaying ? "nc-eq h-full" : "h-1.5"}`}
+          style={isPlaying ? { animationDelay: `${i * 0.15}s` } : undefined}
+        />
+      ))}
+    </span>
+  </button>
+);
+
+/* -------------------------------------------------------------------- root */
+
+export const NoirCallaTheme: React.FC<InvitationThemeProps> = ({ data, guest, music, copy, rsvp }) => {
+  const { invitation } = data;
+  const [opened, setOpened] = useState(false);
+  const groom = nick(invitation.groomNickName, "Mempelai Pria");
+  const bride = nick(invitation.brideNickName, "Mempelai Wanita");
+  const couple = `${groom} & ${bride}`;
+
+  useEffect(() => {
+    if (opened) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [opened]);
+
+  const handleOpen = () => {
+    setOpened(true);
+    music.start();
+  };
+
+  const events: EventInfo[] = [
+    {
+      label: copy.ceremonyLabel,
+      date: invitation.akadDate,
+      start: invitation.akadStartTime,
+      end: invitation.akadEndTime,
+      venue: invitation.akadVenueName,
+      address: invitation.akadAddress,
+      mapUrl: invitation.akadMapUrl,
+    },
+    {
+      label: copy.receptionLabel,
+      date: invitation.resepsiDate,
+      start: invitation.resepsiStartTime,
+      end: invitation.resepsiEndTime,
+      venue: invitation.resepsiVenueName,
+      address: invitation.resepsiAddress,
+      mapUrl: invitation.resepsiMapUrl,
+    },
+  ].filter((e) => e.date || e.venue);
+
+  const hasGift = data.bankAccounts.length > 0 || Boolean(invitation.giftAddress?.trim());
+
+  return (
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#080B11] font-sans text-[#F5F0E6] antialiased selection:bg-[#D4AF37]/30">
+      <NoirCallaKeyframes />
+      <GoldDust className="fixed inset-0 z-0" />
+
+      <div className="relative z-10 mx-auto max-w-xl">
+        <Hero
+          invitation={invitation}
+          guestName={guest?.name?.trim() || null}
+          badge={copy.badge}
+          opened={opened}
+          onOpen={handleOpen}
+        />
+
+        <main aria-hidden={!opened} style={{ visibility: opened ? "visible" : "hidden" }}>
+          <Countdown invitation={invitation} />
+
+          {invitation.openingQuote?.trim() && <Quote text={invitation.openingQuote} source={invitation.quoteSource} />}
+
+          <section aria-labelledby="nc-couple" className="px-6 py-12">
+            <SectionTitle eyebrow="Mempelai" title="Kedua Mempelai" id="nc-couple" />
+            <p className={`mx-auto -mt-4 mb-12 max-w-sm text-center text-sm leading-relaxed ${MUTED}`}>
+              {copy.coupleIntro}
+            </p>
+            <Person
+              role="Putra"
+              fullName={nick(invitation.groomFullName, groom)}
+              photoUrl={invitation.groomPhotoUrl}
+              father={invitation.groomFather}
+              mother={invitation.groomMother}
+              instagram={invitation.groomInstagram}
+            />
+            <p aria-hidden="true" className="my-10 text-center font-playfair text-4xl italic text-[#D4AF37]">
+              &amp;
+            </p>
+            <Person
+              role="Putri"
+              fullName={nick(invitation.brideFullName, bride)}
+              photoUrl={invitation.bridePhotoUrl}
+              father={invitation.brideFather}
+              mother={invitation.brideMother}
+              instagram={invitation.brideInstagram}
+            />
           </section>
-        )}
 
-        {/* Section 8: RSVP & Buku Tamu */}
-        <section className="space-y-6 opacity-0 translate-y-6" data-animate>
-          <div className="text-center space-y-2">
-            <h2 className={`text-2xl font-bold ${theme.headingFont}`}>Buku Tamu & Doa Restu</h2>
-            <p className={`text-xs ${theme.textMuted || "text-slate-300"}`}>Sampaikan ucapan doa dan konfirmasi kehadiran Anda</p>
-            <GoldDivider className="mt-3" />
-          </div>
+          <CallaDivider className="py-4" />
 
-          {/* Form */}
-          <form
-            onSubmit={handleRsvpSubmit}
-            className={`p-4 sm:p-6 rounded-3xl ${theme.cardBg} border ${theme.cardBorder} space-y-5 shadow-lg`}
-          >
-            <div>
-              <label className={`block text-xs font-bold mb-2 ${theme.textMuted || "text-slate-300"}`}>Nama Anda</label>
-              <input
-                type="text"
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border bg-[#0A0E17] border-[#D4AF37]/20 focus:border-[#D4AF37]/50 text-slate-200 placeholder-slate-400/60 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40`}
-                placeholder="Tuliskan nama lengkap Anda"
-                value={rsvpName}
-                onChange={(e) => setRsvpName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className={`block text-xs font-bold mb-2 ${theme.textMuted || "text-slate-300"}`}>Konfirmasi Kehadiran</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "hadir", label: "Hadir" },
-                  { id: "tidak_hadir", label: "Berhalangan" },
-                  { id: "ragu", label: "Ragu-ragu" },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setAttendance(opt.id as "hadir" | "tidak_hadir" | "ragu")}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
-                      attendance === opt.id
-                        ? "bg-[#D4AF37] text-[#080B11] border-[#D4AF37] shadow-md"
-                        : "bg-black/20 border-[#D4AF37]/15 hover:bg-black/30 text-white/50"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
+          {events.length > 0 && (
+            <section aria-labelledby="nc-events" className="px-6 py-12">
+              <SectionTitle eyebrow="Waktu & Tempat" title="Rangkaian Acara" id="nc-events" />
+              <div className="space-y-5">
+                {events.map((event) => (
+                  <EventCard key={event.label} event={event} invitation={invitation} couple={couple} />
                 ))}
               </div>
+            </section>
+          )}
+
+          {data.loveStories.length > 0 && <LoveStory items={data.loveStories} />}
+
+          {data.gallery.length > 0 && <Gallery items={data.gallery} />}
+
+          {hasGift && (
+            <Gift intro={copy.giftIntro} accounts={data.bankAccounts} address={invitation.giftAddress?.trim() || null} />
+          )}
+
+          <Rsvp data={data} guest={guest} rsvp={rsvp} />
+
+          <footer className="px-6 pb-28 pt-12 text-center">
+            <div className="flex items-end justify-center" aria-hidden="true">
+              <CallaLily className="h-24 w-12 -rotate-12" />
+              <CallaLily className="h-24 w-12 -scale-x-100 rotate-12" />
             </div>
+            <p className="mt-8 text-sm text-slate-200">{copy.thanks}</p>
+            <p className="mt-3 break-words font-playfair text-4xl leading-tight text-[#F5F0E6]">
+              {groom} <span className="italic text-[#D4AF37]">&amp;</span> {bride}
+            </p>
+            <p className="mt-10 text-xs text-slate-400">Powered by WeddingPlan</p>
+          </footer>
+        </main>
+      </div>
 
-            {attendance === "hadir" && (
-              <div>
-                <label className={`block text-xs font-bold mb-2 ${theme.textMuted || "text-slate-300"}`}>Jumlah Tamu</label>
-                <select
-                  value={guestCount}
-                  onChange={(e) => setGuestCount(Number(e.target.value))}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border bg-[#0A0E17] border-[#D4AF37]/20 focus:border-[#D4AF37]/50 text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40`}
-                >
-                  <option value={1}>1 Orang</option>
-                  <option value={2}>2 Orang</option>
-                  <option value={3}>3 Orang</option>
-                  <option value={4}>4 Orang</option>
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label className={`block text-xs font-bold mb-2 ${theme.textMuted || "text-slate-300"}`}>Ucapan & Doa Restu</label>
-              <textarea
-                rows={3}
-                className={`w-full p-3.5 rounded-xl text-xs font-medium border bg-[#0A0E17] border-[#D4AF37]/20 focus:border-[#D4AF37]/50 text-slate-200 placeholder-slate-400/60 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/40`}
-                placeholder="Tuliskan doa restu untuk kedua mempelai..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmittingRsvp}
-              className={`w-full py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 shadow-lg transition-all ${theme.buttonPrimary} disabled:opacity-50`}
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{isSubmittingRsvp ? "Mengirimkan..." : "Kirim Konfirmasi & Ucapan"}</span>
-            </button>
-          </form>
-
-          {/* List of RSVPs / Guest Wishes */}
-          <div className="space-y-3">
-            <h3 className={`text-xs font-bold uppercase tracking-wider text-center ${theme.textMuted || "text-slate-300"}`}>
-              Doa Restu dari Para Tamu ({rsvps.length})
-            </h3>
-
-            {rsvps.length === 0 ? (
-              <p className={`text-center text-xs py-4 ${theme.textMuted || "text-slate-300"} opacity-70`}>Jadilah yang pertama memberikan doa restu!</p>
-            ) : (
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1 scrollbar-thin">
-                {rsvps.map((r) => (
-                  <div
-                    key={r.id}
-                    className={`p-4 rounded-2xl ${theme.cardBg} border ${theme.cardBorder} space-y-1.5 shadow-sm`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <h4 className="text-xs font-bold text-slate-100 truncate">{r.guestName}</h4>
-                      <span className={`shrink-0 px-2 py-0.5 rounded-md text-[9px] font-bold ${
-                        r.attendanceStatus === "hadir"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : r.attendanceStatus === "tidak_hadir"
-                          ? "bg-rose-500/20 text-rose-300"
-                          : "bg-amber-500/20 text-amber-300"
-                      }`}>
-                        {r.attendanceStatus === "hadir"
-                          ? `Hadir (${r.guestCount} org)`
-                          : r.attendanceStatus === "tidak_hadir"
-                          ? "Berhalangan"
-                          : "Ragu-ragu"}
-                      </span>
-                    </div>
-                    {r.message && <p className={`text-xs leading-relaxed font-serif italic ${theme.textMuted || "text-slate-300"}`}>"{r.message}"</p>}
-                    <p className={`text-[9px] text-right ${theme.textMuted || "text-slate-300"} opacity-70`}>
-                      {new Date(r.createdAt).toLocaleDateString("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="text-center space-y-3 pt-12 pb-6 border-t border-[#D4AF37]/15 opacity-0 translate-y-6 relative" data-animate>
-          <CallaLilyAccent className="absolute -top-6 left-1/2 -translate-x-1/2 w-10 h-10 opacity-20 rotate-180" />
-          <Heart className="w-5 h-5 text-[#D4AF37] mx-auto fill-[#D4AF37]/30" />
-          <p className={`text-sm font-bold ${theme.headingFont}`}>
-            {invitation.groomNickName} & {invitation.brideNickName}
-          </p>
-          <p className={`text-[10px] tracking-wider uppercase ${theme.textMuted || "text-slate-300"} opacity-60`}>
-            Terima kasih atas doa restu Anda
-          </p>
-          <p className={`text-[9px] ${theme.textMuted || "text-slate-300"} opacity-30`}>
-            Powered by WeddingPlan
-          </p>
-        </footer>
-      </main>
+      {opened && music.hasMusic && <MusicButton isPlaying={music.isPlaying} onToggle={music.toggle} />}
     </div>
   );
 };

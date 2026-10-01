@@ -13,6 +13,7 @@ model User {
   username       String?         @unique
   password       String
   role           String          @default("USER") // "USER" | "ADMIN"
+  tokenVersion   Int             @default(0)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   weddingProfile WeddingProfile?
@@ -34,6 +35,7 @@ model WeddingProfile {
   operasionalTasks OperasionalTask[]
   kuaDocuments     KuaDocument[]
   digitalInvitation DigitalInvitation?
+  assets           InvitationAsset[]
 }
 
 model BudgetItem {
@@ -115,7 +117,9 @@ model DigitalInvitation {
   quoteSource     String?         @default("QS. Ar-Rum: 21")
   bgMusicUrl      String?         @default("https://assets.mixkit.co/music/preview/mixkit-romantic-moment-1147.mp3")
   isMusicAutoPlay Boolean         @default(true)
-  isPublished     Boolean         @default(true)
+  isPublished     Boolean         @default(false)
+  tone            String          @default("islami") // "islami" | "umum"
+  timezone        String          @default("WIB")    // "WIB" | "WITA" | "WIT"
 
   // Foto Sampul & Background
   coverPhotoUrl   String?         @default("https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&auto=format&fit=crop&q=80")
@@ -170,6 +174,8 @@ model InvitationRsvp {
   id               String            @id @default(cuid())
   invitationId     String
   invitation       DigitalInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  guestId          String?           @unique
+  guest            InvitationGuest?  @relation(fields: [guestId], references: [id], onDelete: SetNull)
   guestName        String
   attendanceStatus String            @default("hadir") // "hadir" | "tidak_hadir" | "ragu"
   guestCount       Int               @default(1)
@@ -183,10 +189,24 @@ model InvitationGuest {
   invitation       DigitalInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   name             String
   slug             String
+  code             String?           @unique
   phone            String?
   category         String?           @default("keluarga") // "keluarga" | "sahabat" | "vip" | "rekan_kerja"
   isSent           Boolean           @default(false)
   createdAt        DateTime          @default(now())
+  rsvp             InvitationRsvp?
+}
+
+model InvitationAsset {
+  id        String         @id @default(cuid())
+  profileId String
+  profile   WeddingProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  path      String         @unique // relatif terhadap UPLOAD_DIR, mis. "<profileId>/<uuid>.webp"
+  kind      String         // "image" | "audio"
+  size      Int
+  createdAt DateTime       @default(now())
+
+  @@index([profileId])
 }
 
 model SystemSetting {

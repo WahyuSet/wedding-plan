@@ -12,19 +12,17 @@ import {
   Trash2,
   Edit2,
   FileSpreadsheet,
-  Layers,
-  Heart,
   ExternalLink,
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api.js";
-import { SeserahanItem, SeserahanTemplate, ApiResponse } from "../types/index.js";
+import { type SeserahanItem, type SeserahanTemplate, type ApiResponse } from "../types/index.js";
 import { useAuthStore } from "../store/authStore.js";
-import { formatRupiah, formatShortRupiah, cn } from "../lib/utils.js";
+import { formatRupiah, cn } from "../lib/utils.js";
 import { exportSeserahanExcel } from "../lib/exportUtils.js";
 import { Topbar } from "../components/layout/Topbar.js";
-import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
+import { Card } from "../components/ui/Card.js";
 import { Button } from "../components/ui/Button.js";
 import { Badge } from "../components/ui/Badge.js";
 import { Input } from "../components/ui/Input.js";

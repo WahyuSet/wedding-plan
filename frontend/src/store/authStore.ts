@@ -1,31 +1,34 @@
 import { create } from "zustand";
-import { User, WeddingProfile } from "../types/index.js";
+import { type User, type WeddingProfile } from "../types/index.js";
 import { api } from "../lib/api.js";
 
 interface AuthState {
   user: User | null;
   profile: WeddingProfile | null;
-  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (token: string, user: User, profile: WeddingProfile) => void;
+  login: (user: User, profile: WeddingProfile) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   updateProfileState: (updatedProfile: Partial<WeddingProfile>) => void;
   updateUserState: (updatedUser: Partial<User>) => void;
 }
 
+// Sesi kini hanya lewat cookie httpOnly; bersihkan sisa token lama di localStorage.
+try {
+  localStorage.removeItem("wedding_token");
+} catch {
+  // storage tidak tersedia
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   profile: null,
-  token: localStorage.getItem("wedding_token"),
   isLoading: true,
-  isAuthenticated: !!localStorage.getItem("wedding_token"),
+  isAuthenticated: false,
 
-  login: (token: string, user: User, profile: WeddingProfile) => {
-    localStorage.setItem("wedding_token", token);
+  login: (user: User, profile: WeddingProfile) => {
     set({
-      token,
       user,
       profile,
       isAuthenticated: true,
@@ -39,9 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (err) {
       console.error("Logout API error:", err);
     } finally {
-      localStorage.removeItem("wedding_token");
       set({
-        token: null,
         user: null,
         profile: null,
         isAuthenticated: false,
@@ -51,12 +52,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
-    const token = localStorage.getItem("wedding_token");
-    if (!token) {
-      set({ isLoading: false, isAuthenticated: false });
-      return;
-    }
-
     try {
       const res = await api.get("/auth/me");
       if (res.data.success) {
@@ -72,12 +67,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           isLoading: false,
         });
       } else {
-        localStorage.removeItem("wedding_token");
-        set({ token: null, user: null, profile: null, isAuthenticated: false, isLoading: false });
+        set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
       }
     } catch (err) {
-      localStorage.removeItem("wedding_token");
-      set({ token: null, user: null, profile: null, isAuthenticated: false, isLoading: false });
+      set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
     }
   },
 

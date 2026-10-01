@@ -35,3 +35,8 @@ Thumbs.db
 # Scratch & temporary files
 scratch_*.js
 inveet-css.css
+
+# Uploads & test artifacts
+backend/uploads/
+backend/tests/.uploads/
+*.db.bak

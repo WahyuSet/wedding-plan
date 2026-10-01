@@ -1,5 +1,5 @@
 import React from "react";
-import { Calendar, MapPin, Heart } from "lucide-react";
+import { Calendar } from "lucide-react";
 import { useAuthStore } from "../../store/authStore.js";
 import { formatDateIndo, cn } from "../../lib/utils.js";
 import { Badge } from "../ui/Badge.js";

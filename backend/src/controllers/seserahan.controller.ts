@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest } from "../types/index.js";
+import { ProfileRequest } from "../types/index.js";
 import { SESERAHAN_TEMPLATES } from "../constants/seserahanTemplates.js";
 
 export const seserahanItemSchema = z.object({
@@ -23,7 +23,7 @@ export const importTemplatesSchema = z.object({
   itemIndices: z.array(z.number().int().min(0)).min(1, "Pilih minimal 1 template item"),
 });
 
-export const getSeserahanItems = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getSeserahanItems = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 
@@ -73,14 +73,14 @@ export const getSeserahanItems = async (req: AuthRequest, res: Response): Promis
   }
 };
 
-export const getSeserahanTemplates = async (_req: AuthRequest, res: Response): Promise<void> => {
+export const getSeserahanTemplates = async (_req: ProfileRequest, res: Response): Promise<void> => {
   res.json({
     success: true,
     data: SESERAHAN_TEMPLATES,
   });
 };
 
-export const importSeserahanTemplates = async (req: AuthRequest, res: Response): Promise<void> => {
+export const importSeserahanTemplates = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { itemIndices } = req.body;
@@ -124,7 +124,7 @@ export const importSeserahanTemplates = async (req: AuthRequest, res: Response):
   }
 };
 
-export const createSeserahanItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createSeserahanItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { itemName, category, estimatedPrice, actualPrice, quantity, isPrepared, giver, brand, link, notes } =
@@ -160,7 +160,7 @@ export const createSeserahanItem = async (req: AuthRequest, res: Response): Prom
   }
 };
 
-export const updateSeserahanItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateSeserahanItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -210,7 +210,7 @@ export const updateSeserahanItem = async (req: AuthRequest, res: Response): Prom
   }
 };
 
-export const deleteSeserahanItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteSeserahanItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;

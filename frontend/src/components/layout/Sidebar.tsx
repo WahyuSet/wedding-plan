@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore.js";
 import { cn } from "../../lib/utils.js";
+import { usePublicSettings } from "../../hooks/usePublicSettings.js";
 
 interface NavItem {
   name: string;
@@ -53,6 +54,10 @@ export interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
   const { profile, user, logout } = useAuthStore();
+  const { settings } = usePublicSettings();
+  const visibleNavItems = navItems.filter(
+    (item) => item.href !== "/invitation-admin" || settings.digital_invitation
+  );
 
   const initials = getInitials(profile?.groomName, profile?.brideName);
   const avatarBg = getAvatarColor(user?.id || "default");
@@ -113,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
 
         {/* Nav Navigation */}
         <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto py-2">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

@@ -11,11 +11,11 @@ import {
   importTemplatesSchema,
 } from "../controllers/seserahan.controller.js";
 import { validate } from "../middleware/validate.middleware.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
+import { authMiddleware, requireProfile } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authMiddleware);
+router.use(authMiddleware, requireProfile);
 
 router.get("/", getSeserahanItems);
 router.get("/templates", getSeserahanTemplates);

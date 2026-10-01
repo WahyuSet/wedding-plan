@@ -6,9 +6,30 @@ import { prisma } from "../lib/prisma.js";
 import { AuthRequest } from "../types/index.js";
 import { DEFAULT_KUA_DOCUMENTS } from "../constants/kuaSeed.js";
 import { DEFAULT_OPERASIONAL_TASKS } from "../constants/operasionalSeed.js";
+import { env, isProduction } from "../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret_wedding_planner_jwt_key_2026";
 const COOKIE_EXPIRES_DAYS = 7;
+
+const signToken = (user: { id: string; email: string; role: string; tokenVersion: number }): string =>
+  jwt.sign(
+    { userId: user.id, email: user.email, role: user.role, tokenVersion: user.tokenVersion },
+    env.JWT_SECRET,
+    { expiresIn: `${COOKIE_EXPIRES_DAYS}d` }
+  );
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: "lax" as const,
+  domain: env.COOKIE_DOMAIN,
+};
+
+const setAuthCookie = (res: Response, token: string): void => {
+  res.cookie("token", token, {
+    ...cookieOptions,
+    maxAge: COOKIE_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
+  });
+};
 
 export const registerSchema = z.object({
   email: z.string().email("Format email tidak valid"),
@@ -132,18 +153,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return { user, profile };
     });
 
-    const token = jwt.sign(
-      { userId: newUser.user.id, email: newUser.user.email, role: newUser.user.role },
-      JWT_SECRET,
-      { expiresIn: `${COOKIE_EXPIRES_DAYS}d` }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: COOKIE_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
-    });
+    const token = signToken(newUser.user);
+    setAuthCookie(res, token);
 
     res.status(201).json({
       success: true,
@@ -201,18 +212,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: `${COOKIE_EXPIRES_DAYS}d` }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: COOKIE_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
-    });
+    const token = signToken(user);
+    setAuthCookie(res, token);
 
     res.json({
       success: true,
@@ -238,7 +239,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const logout = async (_req: Request, res: Response): Promise<void> => {
-  res.clearCookie("token");
+  res.clearCookie("token", cookieOptions);
   res.json({
     success: true,
     message: "Logout berhasil.",
@@ -404,14 +405,18 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedNewPassword },
+      data: { password: hashedNewPassword, tokenVersion: { increment: 1 } },
     });
+
+    const token = signToken(updatedUser);
+    setAuthCookie(res, token);
 
     res.json({
       success: true,
-      message: "Password berhasil diperbarui. Silakan login ulang.",
+      message: "Password berhasil diperbarui. Sesi di perangkat lain telah dikeluarkan.",
+      data: { token },
     });
   } catch (error) {
     console.error("ChangePassword Error:", error);
