@@ -10,7 +10,6 @@ import {
   Mail,
   ArrowRight,
   CheckCircle2,
-  ChevronRight,
   Calendar,
   AlertCircle,
   Menu,
@@ -44,7 +43,7 @@ export const LandingPage: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+          <nav className="hidden lg:flex items-center gap-7 text-sm font-semibold text-slate-600 whitespace-nowrap">
             <a href="#fitur" className="hover:text-[#E11D48] transition-colors">
               Fitur Lengkap
             </a>
@@ -60,7 +59,7 @@ export const LandingPage: React.FC = () => {
           </nav>
 
           {/* Desktop Auth State Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {isAuthenticated ? (
               <Link to="/dashboard">
                 <Button
@@ -94,7 +93,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2">
             {isAuthenticated ? (
               <Link to="/dashboard">
                 <Button variant="primary" size="sm" className="text-xs px-2.5 py-1.5">
@@ -120,7 +119,7 @@ export const LandingPage: React.FC = () => {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-b border-slate-200 bg-white/95 px-4 py-4 space-y-3 shadow-lg animate-fade-in">
+          <div className="lg:hidden border-b border-slate-200 bg-white/95 px-4 py-4 space-y-3 shadow-lg animate-fade-in">
             <a
               href="#fitur"
               onClick={() => setMobileMenuOpen(false)}
@@ -186,15 +185,18 @@ export const LandingPage: React.FC = () => {
             {/* Left Column: Value Proposition */}
             <div className="lg:col-span-7 space-y-6 text-left">
               {/* Eyebrow badge (taste-skill compliant: Lucide Gem icon, no raw emoji) */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-xs font-bold text-[#E11D48]">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-50 border border-rose-200/80 text-xs font-bold text-[#BE123C]">
                 <Gem className="w-3.5 h-3.5 text-[#E11D48]" />
                 <span>Smart Wedding Planning Mandiri</span>
               </div>
 
-              {/* Main Headline (max 2 lines desktop) */}
-              <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-slate-900 tracking-tight leading-[1.12]">
-                Rencanakan Pernikahan Impian <br className="hidden sm:inline" />
-                <span className="text-[#E11D48] font-playfair italic font-bold">Tanpa Stres</span> & Bebas Overbudget
+              {/* Main Headline (balanced: 3 lines desktop, 2 lines tablet) */}
+              <h1 className="text-4xl sm:text-5xl lg:text-[46px] xl:text-[54px] font-extrabold text-slate-900 tracking-tight leading-[1.12] text-balance">
+                Rencanakan Pernikahan <br className="hidden lg:inline" />
+                Impian{" "}
+                <span className="text-[#E11D48] font-playfair italic font-bold whitespace-nowrap">Tanpa Stres</span>{" "}
+                <br className="hidden lg:inline" />
+                &amp;&nbsp;Bebas Overbudget
               </h1>
 
               {/* Concise Subtext (<= 20 words) */}
@@ -254,29 +256,29 @@ export const LandingPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-900">Hitung Mundur Hari-H</p>
-                        <p className="text-[11px] text-slate-400">Akad & Resepsi Pernikahan</p>
+                        <p className="text-xs text-slate-500">Akad & Resepsi Pernikahan</p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
                       Tersisa 118 Hari
                     </span>
                   </div>
                   <div className="grid grid-cols-4 gap-2 text-center pt-1">
                     <div className="bg-slate-50 rounded-xl py-2 px-1 border border-slate-100">
                       <span className="text-base sm:text-lg font-black text-slate-900">118</span>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Hari</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Hari</p>
                     </div>
                     <div className="bg-slate-50 rounded-xl py-2 px-1 border border-slate-100">
                       <span className="text-base sm:text-lg font-black text-slate-900">14</span>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Jam</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Jam</p>
                     </div>
                     <div className="bg-slate-50 rounded-xl py-2 px-1 border border-slate-100">
                       <span className="text-base sm:text-lg font-black text-slate-900">42</span>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Menit</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Menit</p>
                     </div>
                     <div className="bg-slate-50 rounded-xl py-2 px-1 border border-slate-100">
                       <span className="text-base sm:text-lg font-black text-slate-900">19</span>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase">Detik</p>
+                      <p className="text-xs font-semibold text-slate-500 uppercase">Detik</p>
                     </div>
                   </div>
                 </div>
@@ -290,7 +292,7 @@ export const LandingPage: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-900">Pengawasan Anggaran</p>
-                        <p className="text-[11px] text-slate-400">Target Rp 120.000.000</p>
+                        <p className="text-xs text-slate-500">Target Rp 120.000.000</p>
                       </div>
                     </div>
                     <span className="text-xs font-black text-slate-900">
@@ -316,11 +318,11 @@ export const LandingPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
                       <p className="text-xs font-bold text-slate-900">Batas Daftar KUA (H-10)</p>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-[#E11D48]">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-[#BE123C] shrink-0 whitespace-nowrap">
                         Prioritas
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    <p className="text-xs text-slate-500 mt-0.5 leading-snug">
                       Pendaftaran resmi Kemenag wajib rampung 10 hari kerja sebelum hari akad. Checklist Surat N1–N4 siap cetak.
                     </p>
                   </div>
@@ -336,7 +338,7 @@ export const LandingPage: React.FC = () => {
                       20+ Template Adat (Jawa, Sunda, Minang, dll)
                     </span>
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
                     1-Klik Impor
                   </span>
                 </div>
@@ -355,7 +357,7 @@ export const LandingPage: React.FC = () => {
                 <FileCheck2 className="w-7 h-7 text-[#E11D48]" />
                 <span>30+ Berkas KUA</span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-sm text-slate-500 leading-relaxed">
                 Panduan resmi Surat N1–N4 dari Kelurahan, Vaksin Puskesmas (Elsimil), hingga SIMKAH Kemenag.
               </p>
             </div>
@@ -365,7 +367,7 @@ export const LandingPage: React.FC = () => {
                 <Gift className="w-7 h-7 text-[#D4AF37]" />
                 <span>20+ Template Adat</span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-sm text-slate-500 leading-relaxed">
                 Katalog kotak seserahan & hantaran siap pakai untuk berbagai adat suku pernikahan di Indonesia.
               </p>
             </div>
@@ -375,7 +377,7 @@ export const LandingPage: React.FC = () => {
                 <Clock className="w-7 h-7 text-emerald-600" />
                 <span>5 Fase Rundown</span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-sm text-slate-500 leading-relaxed">
                 Manajemen timeline terstruktur dari H-90, H-30, gladi resik H-7, hari-H jam-ke-jam, hingga pelunasan vendor.
               </p>
             </div>
@@ -384,7 +386,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 4. Core Features Bento Grid */}
-      <section id="fitur" className="py-20 bg-[#FBFBFA]">
+      <section id="fitur" className="scroll-mt-16 py-20 bg-[#FBFBFA]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-14">
@@ -440,7 +442,7 @@ export const LandingPage: React.FC = () => {
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
                   Panduan & Legalitas Berkas KUA
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                <p className="text-sm text-slate-600 leading-relaxed mb-4">
                   Checklist lengkap 30+ persyaratan nikah resmi: Surat N1–N4 Kelurahan, Imunisasi TT Puskesmas, sertifikat Elsimil, hingga pendaftaran online SIMKAH Kemenag.
                 </p>
                 <div className="p-3 bg-rose-50/70 border border-rose-100 rounded-xl text-xs text-[#BE123C] space-y-1">
@@ -448,7 +450,7 @@ export const LandingPage: React.FC = () => {
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     Kalkulasi Batas Waktu H-10
                   </p>
-                  <p className="text-[11px] text-rose-700">
+                  <p className="text-xs text-rose-700">
                     Notifikasi otomatis batas pendaftaran ke KUA agar tidak terkena denda dispensasi.
                   </p>
                 </div>
@@ -469,7 +471,7 @@ export const LandingPage: React.FC = () => {
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
                   Katalog Seserahan Adat Nusantara
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                <p className="text-sm text-slate-600 leading-relaxed mb-4">
                   Bingung apa saja isi kotak hantaran? Impor katalog adat siap pakai (Adat Jawa, Sunda, Minang, dll) dalam satu klik dan pantau kesiapan barang yang sudah terbeli.
                 </p>
                 <ul className="text-xs text-slate-600 space-y-1.5">
@@ -498,12 +500,12 @@ export const LandingPage: React.FC = () => {
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
                   Rundown & Operasional Hari-H
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                <p className="text-sm text-slate-600 leading-relaxed mb-4">
                   Jadwal terinci mulai dari akad nikah, sungkeman, kirab pengantin, hingga ramah tamah resepsi. Tetapkan Penanggung Jawab (PIC) untuk setiap agenda agar keluarga dan vendor selaras.
                 </p>
                 <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <p className="font-semibold text-slate-700">5 Fase Timeline Standar:</p>
-                  <p className="text-[11px] mt-0.5">Persiapan Awal (H-90) s/d Pasca Nikah & Disdukcapil.</p>
+                  <p className="text-xs mt-0.5">Persiapan Awal (H-90) s/d Pasca Nikah & Disdukcapil.</p>
                 </div>
               </div>
 
@@ -521,10 +523,10 @@ export const LandingPage: React.FC = () => {
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
                   Undangan Digital Modern
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-4">
+                <p className="text-sm text-slate-600 leading-relaxed mb-4">
                   Bagikan undangan pernikahan online yang elegan langsung dari platform. Dilengkapi musik latar, peta venue Google Maps, galeri foto, dan konfirmasi kehadiran (RSVP) tamu.
                 </p>
-                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
+                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Kustomisasi URL Slug Mandiri</span>
                 </div>
@@ -539,7 +541,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 5. Workflow Section (3 Simple Steps) */}
-      <section id="cara-kerja" className="py-20 bg-white border-t border-slate-200/80">
+      <section id="cara-kerja" className="scroll-mt-16 py-20 bg-white border-t border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-16">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -559,7 +561,7 @@ export const LandingPage: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900">
                 Tentukan Target & Tanggal
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Daftar akun dan masukkan data calon mempelai, tanggal akad/resepsi, lokasi venue, serta estimasi total anggaran yang direncanakan.
               </p>
             </div>
@@ -572,20 +574,20 @@ export const LandingPage: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900">
                 Lengkapi Checklist & Biaya
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Gunakan template adat seserahan, pantau checklist berkas KUA sesuai deadline, dan catat DP vendor secara transparan bersama pasangan.
               </p>
             </div>
 
             {/* Step 3 */}
             <div className="bg-[#FBFBFA] rounded-3xl p-6 sm:p-8 border border-slate-200/80 relative space-y-4">
-              <div className="w-10 h-10 rounded-xl bg-[#D4AF37] text-white font-extrabold flex items-center justify-center text-sm shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-[#D4AF37] text-slate-900 font-extrabold flex items-center justify-center text-sm shadow-sm">
                 03
               </div>
               <h3 className="text-lg font-bold text-slate-900">
                 Eksekusi Hari-H Tanpa Stres
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Bagikan rundown jam-ke-jam ke PIC keluarga dan panitia. Nikmati momen sakral pernikahan dengan tenang karena semua sudah terkontrol.
               </p>
             </div>
@@ -594,7 +596,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 6. Undangan Digital Showcase Banner */}
-      <section id="undangan" className="py-16 bg-[#FBFBFA] border-t border-slate-200/80">
+      <section id="undangan" className="scroll-mt-16 py-16 bg-[#FBFBFA] border-t border-slate-200/80">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -627,7 +629,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 7. Testimonials Section (Social Proof) */}
-      <section id="testimoni" className="py-20 bg-white border-t border-slate-200/80">
+      <section id="testimoni" className="scroll-mt-16 py-20 bg-white border-t border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto space-y-3 mb-16">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -648,7 +650,7 @@ export const LandingPage: React.FC = () => {
                       <Star key={i} className="w-4 h-4 fill-current" />
                     ))}
                   </div>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                     💰 Hemat Rp 12 Juta
                   </span>
                 </div>
@@ -677,7 +679,7 @@ export const LandingPage: React.FC = () => {
                       <Star key={i} className="w-4 h-4 fill-current" />
                     ))}
                   </div>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-rose-50 text-[#BE123C] border border-rose-200/60">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-[#BE123C] border border-rose-200/60">
                     📋 Bebas Drama KUA
                   </span>
                 </div>
@@ -706,7 +708,7 @@ export const LandingPage: React.FC = () => {
                       <Star key={i} className="w-4 h-4 fill-current" />
                     ))}
                   </div>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
                     ⏱️ Rundown Tepat Waktu
                   </span>
                 </div>
@@ -757,7 +759,7 @@ export const LandingPage: React.FC = () => {
             </Link>
           </div>
 
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Tanpa kartu kredit • Siap pakai dalam 1 menit • 100% Bebas Biaya
           </p>
         </div>
@@ -775,7 +777,7 @@ export const LandingPage: React.FC = () => {
               <span className="text-base font-extrabold text-slate-900">
                 Wedding<span className="text-[#E11D48]">Plan</span>
               </span>
-              <span className="text-xs text-slate-400 border-l border-slate-200 pl-2.5 ml-0.5">
+              <span className="text-xs text-slate-500 border-l border-slate-200 pl-2.5 ml-0.5">
                 Smart Wedding Budgeting & Planner
               </span>
             </div>
@@ -803,7 +805,7 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 pt-8 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
+          <div className="mt-8 pt-8 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
             <p>© {new Date().getFullYear()} WeddingPlan. Hak cipta dilindungi undang-undang.</p>
             <p>Didesain untuk pernikahan bahagia di Indonesia 🇮🇩</p>
           </div>

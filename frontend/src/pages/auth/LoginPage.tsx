@@ -38,7 +38,7 @@ export const LoginPage: React.FC = () => {
       const res = await api.post("/auth/login", data);
 
       if (res.data.success) {
-        login(res.data.data.token, res.data.data.user, res.data.data.profile);
+        login(res.data.data.user, res.data.data.profile);
         if (res.data.data.user?.role === "ADMIN") {
           toast.success("Selamat datang, Superadmin! 🛡️", {
             description: "Mengakses Konsol Administrator WeddingPlan.",

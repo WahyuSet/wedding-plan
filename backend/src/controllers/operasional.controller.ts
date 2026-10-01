@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest } from "../types/index.js";
+import { ProfileRequest } from "../types/index.js";
 import { DEFAULT_OPERASIONAL_TASKS } from "../constants/operasionalSeed.js";
 
 export const operasionalTaskSchema = z.object({
@@ -19,7 +19,7 @@ export const operasionalTaskSchema = z.object({
 
 export const updateOperasionalTaskSchema = operasionalTaskSchema.partial();
 
-export const getOperasionalTasks = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getOperasionalTasks = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 
@@ -79,7 +79,7 @@ export const getOperasionalTasks = async (req: AuthRequest, res: Response): Prom
   }
 };
 
-export const createOperasionalTask = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createOperasionalTask = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { taskName, phase, scheduledTime, scheduledDate, assignedTo, priority, isDone, notes } =
@@ -113,7 +113,7 @@ export const createOperasionalTask = async (req: AuthRequest, res: Response): Pr
   }
 };
 
-export const updateOperasionalTask = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateOperasionalTask = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -163,7 +163,7 @@ export const updateOperasionalTask = async (req: AuthRequest, res: Response): Pr
   }
 };
 
-export const deleteOperasionalTask = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteOperasionalTask = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -197,7 +197,7 @@ export const deleteOperasionalTask = async (req: AuthRequest, res: Response): Pr
   }
 };
 
-export const resetOperasionalTasks = async (req: AuthRequest, res: Response): Promise<void> => {
+export const resetOperasionalTasks = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 

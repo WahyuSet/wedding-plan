@@ -1,7 +1,4 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
-import { BudgetItem, BudgetSummary, WeddingProfile, SeserahanItem } from "../types/index.js";
+import { type BudgetItem, type BudgetSummary, type WeddingProfile, type SeserahanItem } from "../types/index.js";
 import { formatRupiah, formatDateIndo } from "./utils.js";
 
 const categoryNames: Record<string, string> = {
@@ -17,11 +14,16 @@ const categoryNames: Record<string, string> = {
   lainnya: "Lain-lain",
 };
 
-export const exportBudgetPDF = (
+export const exportBudgetPDF = async (
   items: BudgetItem[],
   summary: BudgetSummary,
   profile: WeddingProfile | null
-) => {
+): Promise<void> => {
+  // Library berat dimuat saat dibutuhkan agar bundle awal tetap kecil.
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
   // Header Banner
@@ -150,11 +152,12 @@ export const exportBudgetPDF = (
   doc.save(`Laporan_Anggaran_Pernikahan_${profile?.groomName || "Wedding"}.pdf`);
 };
 
-export const exportBudgetExcel = (
+export const exportBudgetExcel = async (
   items: BudgetItem[],
   summary: BudgetSummary,
   profile: WeddingProfile | null
 ) => {
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
   // Summary Data
@@ -237,10 +240,11 @@ const seserahanCategoryNames: Record<string, string> = {
   lainnya: "Lain-lain",
 };
 
-export const exportSeserahanExcel = (
+export const exportSeserahanExcel = async (
   items: SeserahanItem[],
   profile: WeddingProfile | null
 ) => {
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
   const data = [

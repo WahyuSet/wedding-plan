@@ -4,12 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  FileCheck2,
   Plus,
   RotateCcw,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   ExternalLink,
   BookOpen,
   Info,
@@ -20,10 +16,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api.js";
-import { KuaDocument, ApiResponse } from "../types/index.js";
+import { type KuaDocument, type ApiResponse } from "../types/index.js";
 import { formatDateShort } from "../lib/utils.js";
 import { Topbar } from "../components/layout/Topbar.js";
-import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
+import { Card } from "../components/ui/Card.js";
 import { Button } from "../components/ui/Button.js";
 import { Badge } from "../components/ui/Badge.js";
 import { Input } from "../components/ui/Input.js";

@@ -79,7 +79,7 @@ export const RegisterPage: React.FC = () => {
       });
 
       if (res.data.success) {
-        login(res.data.data.token, res.data.data.user, res.data.data.profile);
+        login(res.data.data.user, res.data.data.profile);
         toast.success("Rencana pernikahan berhasil dibuat! 💍", {
           description: "Template dokumen KUA dan tugas operasional telah disiapkan otomatis.",
         });

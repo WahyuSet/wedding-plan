@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      # Backend mengganti blok di antara penanda ini dengan meta per undangan di domain undangan.
+      - name: Penanda SEO ada di hasil build
+        run: grep -q -- '<!--seo:start-->' dist/index.html && grep -q -- '<!--seo:end-->' dist/index.html
+
+  # Image backend ikut mem-build frontend (build context = akar repo) dan melayani domain undangan.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f backend/Dockerfile -t weddingplan-api .
+      - name: Jalankan container
+        run: |
+          docker run -d --name api -p 5000:5000 \
+            -e JWT_SECRET=ci_only_secret_ci_only_secret_ci_only_secret \
+            -e FRONTEND_URL=http://app.test \
+            -e INVITATION_URL=http://undangan.test \
+            weddingplan-api
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:5000/api/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "Server tidak merespons /api/health"
+          exit 1
+      - name: Domain undangan dilayani dari image
+        run: |
+          set -euo pipefail
+          site() { curl -fsS -H "Host: undangan.test" "http://localhost:5000$1"; }
+
+          status() { curl -s -o /dev/null -w '%{http_code}' -H "Host: undangan.test" "$@"; }
+
+          robots="$(site /robots.txt)"
+          grep -q "Disallow: /" <<< "$robots"
+
+          shell="$(site /contoh-slug)"
+          grep -q '<meta name="wp-site" content="invitation">' <<< "$shell"
+          grep -q 'content="noindex, nofollow"' <<< "$shell"
+          if grep -q -e 'seo:start' -e 'weddingplan.id' <<< "$shell"; then echo "Blok SEO landing tidak diganti"; exit 1; fi
+
+          asset="$(grep -o -m 1 '/assets/[^"]*\.js' <<< "$shell")"
+          site "$asset" > /dev/null
+
+          test "$(status http://localhost:5000/)" = "302"
+          test "$(status -X POST http://localhost:5000/api/auth/login)" = "404"
+          settings="$(curl -fsS http://localhost:5000/api/settings/public)"
+          grep -q '"invitation_url":"http://undangan.test"' <<< "$settings"
+      - name: Log container
+        if: failure()
+        run: docker logs api

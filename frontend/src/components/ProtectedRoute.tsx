@@ -2,9 +2,12 @@ import React, { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore.js";
 import { Skeleton } from "./ui/Skeleton.js";
+import { MaintenanceScreen } from "./MaintenanceScreen.js";
+import { usePublicSettings } from "../hooks/usePublicSettings.js";
 
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth, user } = useAuthStore();
+  const { settings } = usePublicSettings();
 
   useEffect(() => {
     checkAuth();
@@ -26,6 +29,10 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (settings.system_maintenance && user?.role !== "ADMIN") {
+    return <MaintenanceScreen />;
   }
 
   return <>{children}</>;

@@ -199,6 +199,7 @@ export interface BankAccountItem {
 export interface InvitationRsvp {
   id: string;
   invitationId: string;
+  guestId?: string | null;
   guestName: string;
   attendanceStatus: "hadir" | "tidak_hadir" | "ragu";
   guestCount: number;
@@ -211,17 +212,23 @@ export interface InvitationGuest {
   invitationId: string;
   name: string;
   slug: string;
+  code: string | null;
   phone: string | null;
   category: "keluarga" | "sahabat" | "vip" | "rekan_kerja";
   isSent: boolean;
   createdAt: string;
 }
 
+export type InvitationTone = "islami" | "umum";
+export type InvitationTimezone = "WIB" | "WITA" | "WIT";
+
 export interface DigitalInvitation {
   id: string;
   profileId: string;
   slug: string;
   theme: "noir-calla" | "chalk-and-vow" | "nocturne-botanica";
+  tone: InvitationTone;
+  timezone: InvitationTimezone;
   title: string;
   openingQuote: string | null;
   quoteSource: string | null;
@@ -269,6 +276,7 @@ export interface DigitalInvitation {
   updatedAt: string;
 
   rsvps?: InvitationRsvp[];
+  rsvpTotal?: number;
   guests?: InvitationGuest[];
 }
 

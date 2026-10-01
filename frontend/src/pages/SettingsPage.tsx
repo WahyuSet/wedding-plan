@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -119,7 +119,7 @@ const AccountTab: React.FC = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isDirty },
+    formState: { errors },
   } = useForm<AccountFormData>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -341,7 +341,7 @@ const SecurityTab: React.FC = () => {
         setNewPassword("");
         setTimeout(() => setSaved(false), 2000);
         toast.success("Password berhasil diperbarui!", {
-          description: "Silakan login ulang jika diperlukan.",
+          description: "Sesi di perangkat lain telah dikeluarkan.",
         });
       }
     } catch (error: any) {

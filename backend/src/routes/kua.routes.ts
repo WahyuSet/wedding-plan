@@ -9,11 +9,11 @@ import {
   updateKuaDocumentSchema,
 } from "../controllers/kua.controller.js";
 import { validate } from "../middleware/validate.middleware.js";
-import { authMiddleware } from "../middleware/auth.middleware.js";
+import { authMiddleware, requireProfile } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authMiddleware);
+router.use(authMiddleware, requireProfile);
 
 router.get("/", getKuaDocuments);
 router.post("/", validate(kuaDocumentSchema), createKuaDocument);

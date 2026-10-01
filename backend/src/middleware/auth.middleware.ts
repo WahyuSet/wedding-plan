@@ -1,9 +1,15 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { AuthRequest, AuthenticatedUser } from "../types/index.js";
+import { AuthRequest } from "../types/index.js";
 import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret_wedding_planner_jwt_key_2026";
+export interface JwtPayload {
+  userId: string;
+  email: string;
+  role?: string;
+  tokenVersion?: number;
+}
 
 export const authMiddleware = async (
   req: AuthRequest,
@@ -13,12 +19,9 @@ export const authMiddleware = async (
   try {
     let token: string | undefined;
 
-    // Check Authorization header (Bearer token)
     if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
       token = req.headers.authorization.split(" ")[1];
-    }
-    // Check Cookies
-    else if (req.cookies && req.cookies.token) {
+    } else if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
     }
 
@@ -30,11 +33,7 @@ export const authMiddleware = async (
       return;
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      userId: string;
-      email: string;
-      role?: string;
-    };
+    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
@@ -45,6 +44,14 @@ export const authMiddleware = async (
       res.status(401).json({
         success: false,
         message: "Pengguna tidak ditemukan atau telah dihapus.",
+      });
+      return;
+    }
+
+    if ((decoded.tokenVersion ?? 0) !== user.tokenVersion) {
+      res.status(401).json({
+        success: false,
+        message: "Sesi tidak valid atau telah kadaluarsa. Silakan login kembali.",
       });
       return;
     }
@@ -71,4 +78,19 @@ export const authMiddleware = async (
       message: "Sesi tidak valid atau telah kadaluarsa. Silakan login kembali.",
     });
   }
+};
+
+export const requireProfile = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user?.profileId) {
+    res.status(403).json({
+      success: false,
+      message: "Akun ini tidak memiliki profil pernikahan.",
+    });
+    return;
+  }
+  next();
 };

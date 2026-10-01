@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest } from "../types/index.js";
+import { ProfileRequest } from "../types/index.js";
 
 export const budgetItemSchema = z.object({
   category: z.string().min(1, "Kategori wajib dipilih"),
@@ -17,7 +17,7 @@ export const budgetItemSchema = z.object({
 
 export const updateBudgetItemSchema = budgetItemSchema.partial();
 
-export const getBudgetItems = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getBudgetItems = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 
@@ -108,7 +108,7 @@ export const getBudgetItems = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const createBudgetItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createBudgetItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { category, itemName, estimatedCost, actualCost, amountPaid, isPaid, paymentStatus, vendorName, notes } =
@@ -153,7 +153,7 @@ export const createBudgetItem = async (req: AuthRequest, res: Response): Promise
   }
 };
 
-export const updateBudgetItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateBudgetItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -216,7 +216,7 @@ export const updateBudgetItem = async (req: AuthRequest, res: Response): Promise
   }
 };
 
-export const deleteBudgetItem = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteBudgetItem = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import {
-  Mail,
   ExternalLink,
   Save,
   Check,
@@ -11,29 +10,21 @@ import {
   Trash2,
   Sparkles,
   Music,
-  Users,
   Calendar,
   Heart,
   CreditCard,
   MessageSquare,
-  Share2,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
   Eye,
-  Settings,
   Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api.js";
 import {
-  DigitalInvitation,
-  InvitationRsvp,
-  InvitationGuest,
-  ApiResponse,
-  LoveStoryItem,
-  GalleryPhotoItem,
-  BankAccountItem,
+  type DigitalInvitation,
+  type ApiResponse,
+  type LoveStoryItem,
+  type GalleryPhotoItem,
+  type BankAccountItem,
 } from "../types/index.js";
 import { Topbar } from "../components/layout/Topbar.js";
 import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
@@ -42,47 +33,44 @@ import { Input } from "../components/ui/Input.js";
 import { Badge } from "../components/ui/Badge.js";
 import { Skeleton } from "../components/ui/Skeleton.js";
 import { ImagePresetModal } from "../components/invitation/ImagePresetModal.js";
+import { GuestManager } from "../components/invitation/GuestManager.js";
+import { FileUploadButton } from "../components/invitation/FileUploadButton.js";
+import { UploadManager } from "../components/invitation/UploadManager.js";
+import { InvitationPreviewPanel } from "../components/invitation/InvitationPreviewPanel.js";
+import { buildDraftInvitation } from "./invitation/previewDraft.js";
+import { INVITATION_THEMES } from "../lib/invitationThemes.js";
+import { withoutSchemaDefaultPhoto } from "../lib/invitationDefaults.js";
+import { publicInvitationUrl, shareInvitationUrl } from "../lib/invitationLinks.js";
+import { usePublicSettings } from "../hooks/usePublicSettings.js";
+import { DEFAULT_QUOTES } from "./invitation/shared/invitationCopy.js";
 
-// Theme presets matching Inveet references
-const THEME_OPTIONS = [
-  {
-    id: "noir-calla",
-    name: "Noir Calla",
-    style: "Dark Minimalist & Luxury",
-    desc: "Nuansa gelap elegan (noir) dengan aksen bunga calla lily putih dan tipografi emas halus.",
-    previewBg: "bg-slate-950",
-    previewText: "text-amber-100",
-    previewBorder: "border-slate-800",
-    accentDot: "bg-[#D4AF37]",
-  },
-  {
-    id: "chalk-and-vow",
-    name: "Chalk & Vow",
-    style: "Light Fine-Art & Editorial",
-    desc: "Kertas chalk hangat, tipografi serif klasik yang airy, bersih, dan romantis.",
-    previewBg: "bg-[#FAF7F2]",
-    previewText: "text-slate-900",
-    previewBorder: "border-stone-300",
-    accentDot: "bg-rose-500",
-  },
-  {
-    id: "nocturne-botanica",
-    name: "Nocturne Botanica",
-    style: "Deep Emerald & Moody Floral",
-    desc: "Keanggunan botani malam hari dengan hijau zamrud gelap dan keemasan hangat.",
-    previewBg: "bg-[#0A1F18]",
-    previewText: "text-emerald-100",
-    previewBorder: "border-emerald-900",
-    accentDot: "bg-emerald-400",
-  },
-];
+const DEFAULT_COVER_URL =
+  "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&auto=format&fit=crop&q=80";
+const PLACEHOLDER_ACCOUNT = "1234567890";
+
+const ToggleRow: React.FC<{
+  label: string;
+  description: string;
+  inputProps: React.InputHTMLAttributes<HTMLInputElement>;
+}> = ({ label, description, inputProps }) => (
+  <label className="flex items-start justify-between gap-4 p-4 rounded-2xl border border-slate-200 bg-white cursor-pointer">
+    <span className="space-y-0.5">
+      <span className="block text-sm font-bold text-slate-900">{label}</span>
+      <span className="block text-xs text-slate-500 leading-relaxed">{description}</span>
+    </span>
+    <span className="relative shrink-0 mt-0.5">
+      <input type="checkbox" className="peer sr-only" {...inputProps} />
+      <span className="block w-11 h-6 rounded-full bg-slate-300 transition-colors peer-checked:bg-[#E11D48] peer-focus-visible:ring-2 peer-focus-visible:ring-[#E11D48]/40 peer-focus-visible:ring-offset-2" />
+      <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+    </span>
+  </label>
+);
 
 export const InvitationAdminPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"theme" | "event" | "story" | "gift" | "rsvps">("theme");
   const [copiedLink, setCopiedLink] = useState(false);
-  const [guestNameInput, setGuestNameInput] = useState("");
-  const [guestCategoryInput, setGuestCategoryInput] = useState<"keluarga" | "sahabat" | "vip" | "rekan_kerja">("sahabat");
+  const [showPreview, setShowPreview] = useState(false);
 
   // Image Preset Picker Modal State
   const [modalPickerConfig, setModalPickerConfig] = useState<{
@@ -98,7 +86,7 @@ export const InvitationAdminPage: React.FC = () => {
   });
 
   // Fetch invitation configuration
-  const { data, isLoading, refetch } = useQuery<ApiResponse<DigitalInvitation>>({
+  const { data, isLoading } = useQuery<ApiResponse<DigitalInvitation>>({
     queryKey: ["digital-invitation-config"],
     queryFn: async () => {
       const res = await api.get("/invitation/config");
@@ -114,6 +102,8 @@ export const InvitationAdminPage: React.FC = () => {
       slug: "",
       theme: "noir-calla",
       title: "The Wedding of",
+      tone: "islami",
+      timezone: "WIB",
       openingQuote: "",
       quoteSource: "",
       bgMusicUrl: "",
@@ -167,28 +157,31 @@ export const InvitationAdminPage: React.FC = () => {
         slug: invitation.slug || "",
         theme: invitation.theme || "noir-calla",
         title: invitation.title || "The Wedding of",
+        tone: invitation.tone || "islami",
+        timezone: invitation.timezone || "WIB",
         openingQuote: invitation.openingQuote || "",
         quoteSource: invitation.quoteSource || "",
         bgMusicUrl: invitation.bgMusicUrl || "",
         isMusicAutoPlay: invitation.isMusicAutoPlay ?? true,
         isPublished: invitation.isPublished ?? true,
 
-        coverPhotoUrl: invitation.coverPhotoUrl || "https://images.unsplash.com/photo-1519741497674-611481863552?w=1600&auto=format&fit=crop&q=80",
-        heroPhotoUrl: invitation.heroPhotoUrl || "https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=1600&auto=format&fit=crop&q=80",
+        // Foto tidak pernah diisi otomatis: foto contoh yang ikut tersimpan akan tampil ke tamu sebagai foto pasangan.
+        coverPhotoUrl: withoutSchemaDefaultPhoto(invitation.coverPhotoUrl) ?? "",
+        heroPhotoUrl: withoutSchemaDefaultPhoto(invitation.heroPhotoUrl) ?? "",
 
         groomFullName: invitation.groomFullName || "",
         groomNickName: invitation.groomNickName || "",
         groomFather: invitation.groomFather || "",
         groomMother: invitation.groomMother || "",
         groomInstagram: invitation.groomInstagram || "",
-        groomPhotoUrl: invitation.groomPhotoUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80",
+        groomPhotoUrl: invitation.groomPhotoUrl || "",
 
         brideFullName: invitation.brideFullName || "",
         brideNickName: invitation.brideNickName || "",
         brideFather: invitation.brideFather || "",
         brideMother: invitation.brideMother || "",
         brideInstagram: invitation.brideInstagram || "",
-        bridePhotoUrl: invitation.bridePhotoUrl || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&auto=format&fit=crop&q=80",
+        bridePhotoUrl: invitation.bridePhotoUrl || "",
 
         akadDate: invitation.akadDate ? invitation.akadDate.split("T")[0] : "",
         akadStartTime: invitation.akadStartTime || "08:00",
@@ -265,75 +258,71 @@ export const InvitationAdminPage: React.FC = () => {
     },
   });
 
-  // Mutation to add guest
-  const addGuestMutation = useMutation({
-    mutationFn: async (guestData: { name: string; category: string }) => {
-      const res = await api.post("/invitation/guests", guestData);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["digital-invitation-config"] });
-      setGuestNameInput("");
-      toast.success("Tamu Berhasil Ditambahkan!");
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.message || "Gagal menambah tamu");
-    },
-  });
-
-  // Mutation to delete guest
-  const deleteGuestMutation = useMutation({
-    mutationFn: async (guestId: string) => {
-      const res = await api.delete(`/invitation/guests/${guestId}`);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["digital-invitation-config"] });
-      toast.success("Tamu dihapus dari daftar");
-    },
-  });
-
-  // Mutation to delete RSVP comment
-  const deleteRsvpMutation = useMutation({
-    mutationFn: async (rsvpId: string) => {
-      const res = await api.delete(`/invitation/rsvps/${rsvpId}`);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["digital-invitation-config"] });
-      toast.success("Ucapan berhasil dihapus");
-    },
-  });
-
   const selectedTheme = watch("theme") || "noir-calla";
   const currentSlug = watch("slug") || invitation?.slug || "wedding";
   const coverPhoto = watch("coverPhotoUrl");
+  const heroPhoto = watch("heroPhotoUrl");
   const groomPhoto = watch("groomPhotoUrl");
   const bridePhoto = watch("bridePhotoUrl");
 
-  const publicUrl = `${window.location.origin}/invitation/${currentSlug}`;
+  const { settings } = usePublicSettings();
+  const publicUrl = publicInvitationUrl(currentSlug, null, settings.invitation_url);
+  const shareUrl = shareInvitationUrl(currentSlug, null, settings.invitation_url);
+
+  // Tautan yang sudah beredar memuat slug lama, jadi menggantinya mematikan tautan itu.
+  const savedSlug = invitation?.slug || "";
+  const guestLinkExample = publicInvitationUrl(
+    savedSlug || "nama-pilihan",
+    "nama-tamu-kode",
+    settings.invitation_url
+  ).replace(/^https?:\/\//, "");
+  const slugChanged = Boolean(savedSlug) && currentSlug.trim().toLowerCase() !== savedSlug;
+  const linksAlreadyShared = Boolean(invitation?.isPublished) || Boolean(invitation?.guests?.some((g) => g.isSent));
+  const slugWarning =
+    slugChanged && linksAlreadyShared
+      ? "Mengubah tautan akan mematikan semua link yang sudah dibagikan ke tamu."
+      : undefined;
 
   const copyPublicUrl = () => {
-    navigator.clipboard.writeText(publicUrl);
+    navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
-    toast.success("Tautan Berhasil Disalin!", { description: publicUrl });
+    toast.success("Tautan Berhasil Disalin!", { description: shareUrl });
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const copyWhatsAppText = (guestName: string, guestSlug: string) => {
-    const link = `${window.location.origin}/invitation/${currentSlug}?to=${encodeURIComponent(guestName)}`;
-    const text = `Kepada Yth. Bpk/Ibu/Saudara/i *${guestName}*,
+  const watched = watch();
+  const checklist = [
+    { ok: Boolean(watched.groomFullName && watched.brideFullName), label: "Nama lengkap kedua mempelai" },
+    { ok: Boolean(watched.akadDate), label: "Tanggal akad" },
+    { ok: Boolean(watched.akadVenueName && watched.akadAddress), label: "Nama tempat dan alamat akad" },
+    {
+      ok: Boolean(watched.coverPhotoUrl) && watched.coverPhotoUrl !== DEFAULT_COVER_URL,
+      label: "Foto sampul pilihan sendiri (bukan foto bawaan)",
+    },
+    {
+      ok: bankList.every((b) => b.accountNumber && b.accountNumber !== PLACEHOLDER_ACCOUNT),
+      label: "Data rekening bukan contoh (kosongkan jika tidak dipakai)",
+    },
+  ];
 
-Tanpa mengurangi rasa hormat, perkenankan kami mengundang Anda untuk menghadiri acara pernikahan kami:
+  const draft = invitation
+    ? buildDraftInvitation({
+        base: invitation,
+        values: watched,
+        loveStory: loveStoryList,
+        gallery: galleryList,
+        bankAccounts: bankList,
+      })
+    : null;
 
-${link}
-
-Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir dan memberikan doa restu. Terima kasih.`;
-
-    navigator.clipboard.writeText(text);
-    toast.success("Teks Undangan WhatsApp Tersalin!", {
-      description: `Siap dikirimkan untuk ${guestName}`,
-    });
+  const handleToneChange = (tone: "islami" | "umum") => {
+    const current = (watched.openingQuote || "").trim();
+    const other = tone === "islami" ? DEFAULT_QUOTES.umum : DEFAULT_QUOTES.islami;
+    // Ganti kutipan hanya jika masih kutipan bawaan atau kosong; kutipan buatan sendiri tidak disentuh.
+    if (!current || current === other.text) {
+      setValue("openingQuote", DEFAULT_QUOTES[tone].text);
+      setValue("quoteSource", DEFAULT_QUOTES[tone].source);
+    }
   };
 
   const handlePresetSelect = (url: string) => {
@@ -343,7 +332,7 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
         updated[modalPickerConfig.galleryIndex].url = url;
         setGalleryList(updated);
       } else {
-        setGalleryList([...galleryList, { url, caption: "Momen Bahagia" }]);
+        setGalleryList([...galleryList, { url, caption: "" }]);
       }
     } else if (modalPickerConfig.targetField) {
       setValue(modalPickerConfig.targetField, url);
@@ -360,7 +349,6 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
   }
 
   const rsvps = invitation?.rsvps || [];
-  const guests = invitation?.guests || [];
 
   const attendingCount = rsvps.filter((r) => r.attendanceStatus === "hadir").length;
   const totalGuestsComing = rsvps
@@ -372,12 +360,21 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
       {/* Topbar */}
       <Topbar
         title="Undangan Pernikahan Digital"
-        description="Kelola tema Inveet, master foto/gambar, detail acara, amplop digital, dan buku tamu online"
+        description="Kelola tema, foto, detail acara, amplop digital, dan buku tamu online"
         action={
           <div className="flex items-center gap-2">
+            <Button
+              variant={showPreview ? "secondary" : "outline"}
+              size="sm"
+              leftIcon={<Eye className="w-4 h-4" />}
+              onClick={() => setShowPreview((v) => !v)}
+              aria-pressed={showPreview}
+            >
+              Pratinjau
+            </Button>
             <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm" leftIcon={<Eye className="w-4 h-4" />}>
-                Lihat Undangan ↗
+              <Button variant="outline" size="sm" leftIcon={<ExternalLink className="w-4 h-4" />}>
+                Buka Undangan
               </Button>
             </a>
             <Button
@@ -397,16 +394,18 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${invitation?.isPublished ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}
+            />
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-              Tautan Undangan Publik Aktif
+              {invitation?.isPublished ? "Tautan Undangan Publik Aktif" : "Undangan Belum Dipublikasikan"}
             </span>
             <Badge variant="neutral" size="sm" className="bg-white/10 text-white border-0">
-              Tema: {THEME_OPTIONS.find((t) => t.id === selectedTheme)?.name}
+              Tema: {INVITATION_THEMES.find((t) => t.id === selectedTheme)?.name}
             </Badge>
           </div>
           <p className="text-sm md:text-base font-bold text-slate-100 font-mono break-all">
-            {publicUrl}
+            {shareUrl}
           </p>
           <p className="text-xs text-slate-400">
             {rsvps.length} Ucapan Masuk • {attendingCount} Konfirmasi Hadir ({totalGuestsComing} Orang Tamu)
@@ -464,19 +463,91 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
         {/* ──────────────── TAB 1: TEMA & GAMBAR MASTER ──────────────── */}
         {activeTab === "theme" && (
           <div className="space-y-6">
+            {/* Publikasi & Pengaturan Umum */}
+            <Card className="p-6 space-y-4">
+              <div>
+                <CardTitle>Publikasi &amp; Pengaturan Umum</CardTitle>
+                <CardDescription>
+                  Undangan baru tidak terlihat oleh tamu sampai Anda mempublikasikannya.
+                </CardDescription>
+              </div>
+
+              <ToggleRow
+                label="Publikasikan undangan"
+                description="Jika aktif, siapa pun yang memiliki tautan dapat membuka undangan dan mengirim RSVP."
+                inputProps={register("isPublished")}
+              />
+              <ToggleRow
+                label="Putar musik saat undangan dibuka"
+                description="Jika mati, tamu tetap dapat memutar musik lewat tombol musik."
+                inputProps={register("isMusicAutoPlay")}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label htmlFor="invitation-tone" className="block text-xs font-semibold text-slate-700">
+                    Gaya bahasa undangan
+                  </label>
+                  <select
+                    id="invitation-tone"
+                    className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#E11D48]"
+                    {...register("tone", { onChange: (e) => handleToneChange(e.target.value) })}
+                  >
+                    <option value="islami">Islami (Walimatul 'Ursy, Akad Nikah)</option>
+                    <option value="umum">Umum (Upacara Pernikahan)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="invitation-timezone" className="block text-xs font-semibold text-slate-700">
+                    Zona waktu acara
+                  </label>
+                  <select
+                    id="invitation-timezone"
+                    className="w-full px-3 py-2.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-[#E11D48]"
+                    {...register("timezone")}
+                  >
+                    <option value="WIB">WIB (UTC+7)</option>
+                    <option value="WITA">WITA (UTC+8)</option>
+                    <option value="WIT">WIT (UTC+9)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-xs font-bold text-slate-800 mb-2">
+                  Kelengkapan undangan ({checklist.filter((c) => c.ok).length}/{checklist.length})
+                </p>
+                <ul className="space-y-1.5">
+                  {checklist.map((item) => (
+                    <li key={item.label} className="flex items-center gap-2 text-xs">
+                      <span
+                        className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                          item.ok ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {item.ok ? <Check className="w-3 h-3" /> : <span className="text-[10px] font-bold">!</span>}
+                      </span>
+                      <span className={item.ok ? "text-slate-600" : "text-slate-900 font-semibold"}>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Card>
+
             {/* Theme Selector */}
             <Card className="p-6 space-y-4">
               <CardHeader>
                 <div>
                   <CardTitle>Pilih Tema Visual Undangan</CardTitle>
                   <CardDescription>
-                    Pilih estetika desain yang sesuai dengan konsep pernikahan Anda (Sesuai Referensi Inveet)
+                    Pilih estetika desain yang sesuai dengan konsep pernikahan Anda 
                   </CardDescription>
                 </div>
               </CardHeader>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {THEME_OPTIONS.map((theme) => {
+                {INVITATION_THEMES.map((theme) => {
                   const isSelected = selectedTheme === theme.id;
                   return (
                     <div
@@ -554,9 +625,62 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                   <Input
                     label="URL Foto Sampul"
                     placeholder="https://images.unsplash.com/..."
-                    hint="Klik tombol 'Pilih dari Master Galeri' atau tempel tautan foto Anda sendiri"
+                    hint="Unggah foto Anda, pilih dari Master Galeri, atau tempel tautan foto"
                     {...register("coverPhotoUrl")}
                   />
+                  <FileUploadButton
+                    kind="image"
+                    onUploaded={(url) => setValue("coverPhotoUrl", url, { shouldDirty: true })}
+                  />
+                </div>
+              </div>
+
+              {/* Foto Pembuka (opsional) */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">Foto Pembuka</p>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Opsional. Kosongkan untuk memakai foto sampul. Dipakai tema Nocturne Botanica dan Chalk &amp; Vow.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<ImageIcon className="w-3.5 h-3.5" />}
+                    onClick={() =>
+                      setModalPickerConfig({
+                        isOpen: true,
+                        title: "Pilih Foto Pembuka",
+                        category: "cover",
+                        targetField: "heroPhotoUrl",
+                      })
+                    }
+                  >
+                    Pilih dari Master Galeri
+                  </Button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  {heroPhoto ? (
+                    <img
+                      src={heroPhoto}
+                      alt="Pratinjau foto pembuka"
+                      className="w-full sm:w-44 h-28 object-cover rounded-2xl border border-slate-200 shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-full sm:w-44 h-28 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                      Memakai foto sampul
+                    </div>
+                  )}
+                  <div className="flex-1 w-full space-y-2">
+                    <Input label="URL Foto Pembuka" placeholder="https://..." {...register("heroPhotoUrl")} />
+                    <FileUploadButton
+                      kind="image"
+                      onUploaded={(url) => setValue("heroPhotoUrl", url, { shouldDirty: true })}
+                    />
+                  </div>
                 </div>
               </div>
             </Card>
@@ -565,12 +689,19 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
             <Card className="p-6 space-y-4">
               <CardTitle>Tautan &amp; Musik Latar</CardTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="URL Slug Undangan (Link Khusus)"
-                  placeholder="contoh: budi-sari"
-                  hint="Tautan Anda: /invitation/nama-pilihan"
-                  {...register("slug")}
-                />
+                <div className="space-y-1.5">
+                  <Input
+                    label="URL Slug Undangan (Link Khusus)"
+                    placeholder="contoh: budi-sari"
+                    hint={`Tautan tamu: ${guestLinkExample}. Simbol seperti & menjadi tanda hubung.`}
+                    {...register("slug")}
+                  />
+                  {slugWarning && (
+                    <p role="alert" className="text-xs font-medium text-amber-700">
+                      {slugWarning}
+                    </p>
+                  )}
+                </div>
                 <Input
                   label="Judul Atas Undangan"
                   placeholder="The Wedding of"
@@ -584,6 +715,13 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                     leftIcon={<Music className="w-4 h-4" />}
                     {...register("bgMusicUrl")}
                   />
+                  <div className="mt-2">
+                    <FileUploadButton
+                      kind="audio"
+                      label="Unggah MP3 (maks 10 MB)"
+                      onUploaded={(url) => setValue("bgMusicUrl", url, { shouldDirty: true })}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -609,6 +747,8 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                 </div>
               </div>
             </Card>
+
+            <UploadManager />
           </div>
         )}
 
@@ -647,6 +787,11 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                 )}
                 <div className="flex-1">
                   <Input label="URL Foto Pria" placeholder="https://..." {...register("groomPhotoUrl")} />
+                  <FileUploadButton
+                    kind="image"
+                    className="mt-2"
+                    onUploaded={(url) => setValue("groomPhotoUrl", url, { shouldDirty: true })}
+                  />
                 </div>
               </div>
 
@@ -691,6 +836,11 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                 )}
                 <div className="flex-1">
                   <Input label="URL Foto Wanita" placeholder="https://..." {...register("bridePhotoUrl")} />
+                  <FileUploadButton
+                    kind="image"
+                    className="mt-2"
+                    onUploaded={(url) => setValue("bridePhotoUrl", url, { shouldDirty: true })}
+                  />
                 </div>
               </div>
 
@@ -823,7 +973,15 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                   <CardTitle>Galeri Foto Prewedding</CardTitle>
                   <CardDescription>Masukkan foto prewedding atau pilih dari master galeri foto</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <FileUploadButton
+                    kind="image"
+                    multiple
+                    label="Unggah Foto"
+                    onUploaded={(url) =>
+                      setGalleryList((prev) => [...prev, { url, caption: "" }])
+                    }
+                  />
                   <Button
                     type="button"
                     variant="outline"
@@ -846,10 +1004,7 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
                     size="sm"
                     leftIcon={<Plus className="w-3.5 h-3.5" />}
                     onClick={() =>
-                      setGalleryList([
-                        ...galleryList,
-                        { url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=800", caption: "Momen Bahagia" },
-                      ])
+                      setGalleryList([...galleryList, { url: "", caption: "" }])
                     }
                   >
                     Tambah Manual
@@ -860,7 +1015,13 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {galleryList.map((photo, idx) => (
                   <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 relative group">
-                    <img src={photo.url} alt="Gallery" className="w-full h-36 object-cover rounded-xl" />
+                    {photo.url ? (
+                      <img src={photo.url} alt="Gallery" className="w-full h-36 object-cover rounded-xl" />
+                    ) : (
+                      <div className="w-full h-36 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold">
+                        Belum ada foto
+                      </div>
+                    )}
                     <div className="flex items-center gap-1.5">
                       <input
                         type="text"
@@ -999,185 +1160,7 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
         )}
 
         {/* ──────────────── TAB 5: TAMU & RSVP ──────────────── */}
-        {activeTab === "rsvps" && (
-          <div className="space-y-6">
-            {/* Generator Undangan WhatsApp */}
-            <Card className="p-6 space-y-4">
-              <CardTitle>Generator Link WhatsApp Per Tamu</CardTitle>
-              <CardDescription>
-                Buat tautan personalisasi otomatis untuk tiap nama tamu, lengkap dengan tombol salin teks WhatsApp
-              </CardDescription>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200"
-                  placeholder="Nama Lengkap Tamu (contoh: Bpk. Bambang Sutrisno)"
-                  value={guestNameInput}
-                  onChange={(e) => setGuestNameInput(e.target.value)}
-                />
-                <select
-                  className="px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
-                  value={guestCategoryInput}
-                  onChange={(e: any) => setGuestCategoryInput(e.target.value)}
-                >
-                  <option value="keluarga">Keluarga</option>
-                  <option value="sahabat">Sahabat</option>
-                  <option value="vip">VIP</option>
-                  <option value="rekan_kerja">Rekan Kerja</option>
-                </select>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                  isLoading={addGuestMutation.isPending}
-                  onClick={() => {
-                    if (!guestNameInput.trim()) return toast.error("Masukkan nama tamu!");
-                    addGuestMutation.mutate({
-                      name: guestNameInput,
-                      category: guestCategoryInput,
-                    });
-                  }}
-                >
-                  Tambah Tamu
-                </Button>
-              </div>
-
-              {/* Guest Table */}
-              {guests.length > 0 && (
-                <div className="mt-4 border border-slate-200 rounded-2xl overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
-                        <tr>
-                          <th className="p-3">Nama Tamu</th>
-                          <th className="p-3">Kategori</th>
-                          <th className="p-3">Link Personalisasi</th>
-                          <th className="p-3 text-right">Aksi WhatsApp</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {guests.map((g) => {
-                          const guestLink = `${publicUrl}?to=${encodeURIComponent(g.name)}`;
-                          return (
-                            <tr key={g.id} className="hover:bg-slate-50/60">
-                              <td className="p-3 font-bold text-slate-900">{g.name}</td>
-                              <td className="p-3">
-                                <Badge variant="neutral" size="sm">
-                                  {g.category}
-                                </Badge>
-                              </td>
-                              <td className="p-3 font-mono text-[11px] text-slate-500 max-w-xs truncate">
-                                {guestLink}
-                              </td>
-                              <td className="p-3 text-right space-x-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[11px] py-1 px-2.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                                  leftIcon={<Share2 className="w-3 h-3" />}
-                                  onClick={() => copyWhatsAppText(g.name, g.slug)}
-                                >
-                                  Salin Teks WA
-                                </Button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteGuestMutation.mutate(g.id)}
-                                  className="text-slate-400 hover:text-rose-600 p-1"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* Rekap Buku Tamu & RSVP */}
-            <Card className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Buku Tamu Online &amp; Ucapan Doa ({rsvps.length})</CardTitle>
-                  <CardDescription>Daftar konfirmasi kehadiran dan doa restu dari tamu undangan</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="success" size="sm">
-                    {attendingCount} Hadir
-                  </Badge>
-                  <Badge variant="danger" size="sm">
-                    {rsvps.filter((r) => r.attendanceStatus === "tidak_hadir").length} Berhalangan
-                  </Badge>
-                </div>
-              </div>
-
-              {rsvps.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 text-xs">
-                  Belum ada ucapan atau konfirmasi RSVP dari tamu.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {rsvps.map((rsvp) => (
-                    <div
-                      key={rsvp.id}
-                      className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-colors flex items-start justify-between gap-4"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-slate-900">{rsvp.guestName}</h4>
-                          <Badge
-                            variant={
-                              rsvp.attendanceStatus === "hadir"
-                                ? "success"
-                                : rsvp.attendanceStatus === "tidak_hadir"
-                                ? "danger"
-                                : "neutral"
-                            }
-                            size="sm"
-                          >
-                            {rsvp.attendanceStatus === "hadir"
-                              ? `Hadir (${rsvp.guestCount} org)`
-                              : rsvp.attendanceStatus === "tidak_hadir"
-                              ? "Berhalangan"
-                              : "Ragu-ragu"}
-                          </Badge>
-                          <span className="text-[10px] text-slate-400">
-                            {new Date(rsvp.createdAt).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                        {rsvp.message && (
-                          <p className="text-xs text-slate-600 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                            "{rsvp.message}"
-                          </p>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => deleteRsvpMutation.mutate(rsvp.id)}
-                        className="text-slate-400 hover:text-rose-600 p-1 shrink-0"
-                        title="Hapus Ucapan"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
-        )}
+        {activeTab === "rsvps" && invitation && <GuestManager invitation={invitation} />}
 
         {/* Bottom Save Bar */}
         <div className="sticky bottom-4 z-20 p-4 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-2xl flex items-center justify-between">
@@ -1195,6 +1178,8 @@ Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Anda berkenan hadir
           </Button>
         </div>
       </form>
+
+      {showPreview && draft && <InvitationPreviewPanel draft={draft} onClose={() => setShowPreview(false)} />}
 
       {/* Preset Image Master Picker Modal */}
       <ImagePresetModal

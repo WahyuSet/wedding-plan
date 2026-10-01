@@ -1,0 +1,21 @@
+# Dipakai oleh `docker build -f backend/Dockerfile .` (build context = akar repo).
+.git
+.github
+.claude
+docs
+anti-slop
+scratch_*.js
+inveet-css.css
+
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/*.db
+**/*.db-journal
+**/*.db.bak
+**/*.log
+
+backend/uploads
+backend/tests

@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { AuthRequest } from "../types/index.js";
+import { ProfileRequest } from "../types/index.js";
 import { DEFAULT_KUA_DOCUMENTS } from "../constants/kuaSeed.js";
 
 export const kuaDocumentSchema = z.object({
@@ -20,7 +20,7 @@ export const kuaDocumentSchema = z.object({
 
 export const updateKuaDocumentSchema = kuaDocumentSchema.partial();
 
-export const getKuaDocuments = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getKuaDocuments = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 
@@ -125,7 +125,7 @@ export const getKuaDocuments = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
-export const createKuaDocument = async (req: AuthRequest, res: Response): Promise<void> => {
+export const createKuaDocument = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { documentName, documentCode, documentType, fromParty, deadline, isCompleted, status, notes } =
@@ -159,7 +159,7 @@ export const createKuaDocument = async (req: AuthRequest, res: Response): Promis
   }
 };
 
-export const updateKuaDocument = async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateKuaDocument = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -227,7 +227,7 @@ export const updateKuaDocument = async (req: AuthRequest, res: Response): Promis
   }
 };
 
-export const deleteKuaDocument = async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteKuaDocument = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
     const { id } = req.params;
@@ -261,7 +261,7 @@ export const deleteKuaDocument = async (req: AuthRequest, res: Response): Promis
   }
 };
 
-export const resetKuaDocuments = async (req: AuthRequest, res: Response): Promise<void> => {
+export const resetKuaDocuments = async (req: ProfileRequest, res: Response): Promise<void> => {
   try {
     const profileId = req.user!.profileId;
 

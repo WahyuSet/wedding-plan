@@ -1,1135 +1,786 @@
-import React, { useState, useEffect } from "react";
-import {
-  Heart,
-  Calendar as CalendarIcon,
-  Clock,
-  MapPin,
-  Music,
-  Send,
-  Gift,
-  Copy,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Instagram,
-  Sparkles,
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
-  Mail,
-  CalendarPlus,
-} from "lucide-react";
-import { toast, Toaster } from "sonner";
-import { DigitalInvitation, LoveStoryItem, GalleryPhotoItem, BankAccountItem, InvitationRsvp } from "../../../types/index.js";
-import { formatDateIndo } from "../../../lib/utils.js";
-import inveetChalkCover from "../../../assets/inveet-chalk-cover.webp";
-import inveetChalkWhiteboard from "../../../assets/inveet-chalk-whiteboard.webp";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CalendarPlus, Check, Copy, Download, Instagram, Mail, MapPin, Send } from "lucide-react";
+import { toast } from "sonner";
+import type { DigitalInvitation, GalleryPhotoItem } from "../../../types/index.js";
+import { instagramHref, safeHref } from "../../../lib/safeUrl.js";
+import { downloadIcs, googleCalendarUrl } from "../shared/calendar.js";
+import type { CalendarEvent } from "../shared/calendar.js";
+import { formatEventDate, formatTimeRange, getEventStart } from "../shared/eventDate.js";
+import { Lightbox } from "../shared/Lightbox.js";
+import type { LightboxTone } from "../shared/Lightbox.js";
+import { longestWordLength } from "../shared/names.js";
+import { Reveal } from "../shared/Reveal.js";
+import { useCountdown } from "../shared/useCountdown.js";
+import { useRsvpForm } from "../shared/useRsvpForm.js";
+import type { AttendanceStatus } from "../shared/useRsvpForm.js";
+import type { InvitationThemeProps } from "../shared/types.js";
+import { BoardSurface, ChalkKeyframes, ChalkStroke } from "./ChalkOrnaments.js";
 
-interface ChalkAndVowThemeProps {
-  invitation: DigitalInvitation;
-  guestName?: string;
-  audioRef: React.RefObject<HTMLAudioElement>;
-  isPlayingMusic: boolean;
-  toggleMusic: () => void;
-  onRsvpSubmit: (payload: any) => Promise<any>;
-  isSubmittingRsvp: boolean;
+// Palette: board #16241E, paper #FAF8F5, sage #4E6B50, one accent (burgundy #8B2E3F) for names and the main action.
+const FOCUS_PAPER =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B2E3F] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FAF8F5]";
+const FOCUS_BOARD =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A882] focus-visible:ring-offset-2 focus-visible:ring-offset-[#16241E]";
+const BTN_BASE =
+  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60";
+const BTN_PRIMARY = `${BTN_BASE} bg-[#8B2E3F] px-6 font-semibold text-white hover:bg-[#722332] ${FOCUS_PAPER}`;
+const BTN_DARK = `${BTN_BASE} bg-[#16241E] px-5 font-semibold text-[#F4EFE6] hover:bg-[#22352C] ${FOCUS_PAPER}`;
+const BTN_QUIET = `${BTN_BASE} border border-[#8A7F74] bg-white px-4 font-medium text-[#2B2420] hover:bg-[#F1ECE4] ${FOCUS_PAPER}`;
+const BTN_BOARD = `${BTN_BASE} bg-[#F4EFE6] px-7 font-semibold text-[#16241E] hover:bg-white ${FOCUS_BOARD}`;
+const CARD = "rounded-lg border border-[#D9D2C7] bg-white";
+const FIELD = `min-h-[44px] w-full rounded-lg border border-[#8A7F74] bg-white px-4 text-base text-[#2B2420] placeholder:text-[#6B5F57] ${FOCUS_PAPER}`;
+const MUTED = "text-[#5C4D44]";
+const SCRIPT = "font-great-vibes font-normal tracking-normal";
+const PHOTO_SHADOW = "shadow-[0_10px_30px_-14px_rgba(43,36,32,0.5)]";
+
+const LIGHTBOX_TONE: LightboxTone = {
+  control: `bg-[#F4EFE6] text-[#16241E] hover:bg-white ${FOCUS_BOARD}`,
+  caption: "text-[#F4EFE6]",
+};
+
+const nick = (value: string | null | undefined, fallback: string): string => value?.trim() || fallback;
+
+// Long single-word names must shrink instead of breaking mid-word on a phone.
+const scriptSize = (...names: string[]): string => {
+  const longest = longestWordLength(...names);
+  if (longest > 13) return "text-4xl";
+  if (longest > 10) return "text-5xl";
+  return "text-6xl";
+};
+
+const SectionTitle: React.FC<{ title: string; id: string; lead?: string }> = ({ title, id, lead }) => (
+  <div className="mb-8 text-center">
+    <h2 id={id} className={`${SCRIPT} text-[2.5rem] leading-tight text-[#2B2420]`}>
+      {title}
+    </h2>
+    <ChalkStroke className="mx-auto mt-1 text-[#4E6B50]" />
+    {lead && <p className={`mx-auto mt-4 max-w-sm text-pretty text-sm leading-relaxed ${MUTED}`}>{lead}</p>}
+  </div>
+);
+
+/* ------------------------------------------------------------------ cover */
+
+interface CoverProps {
+  bride: string;
+  groom: string;
+  date: string;
+  guestName: string | null;
+  onOpen: () => void;
 }
 
-export const ChalkAndVowTheme: React.FC<ChalkAndVowThemeProps> = ({
+const Cover: React.FC<CoverProps> = ({ bride, groom, date, guestName, onOpen }) => (
+  <section
+    aria-label="Sampul undangan"
+    className="relative flex min-h-[100dvh] flex-col items-center justify-center px-10 py-16 text-center text-[#F4EFE6]"
+  >
+    <BoardSurface frame sprigs />
+    <div className="relative w-full">
+      <p className="font-playfair text-sm italic text-[#C4D0C5]">Undangan Pernikahan</p>
+      <h1 className={`mt-4 break-words leading-[1.15] ${SCRIPT} ${scriptSize(bride, groom)}`}>
+        {bride}
+        <span className="block font-playfair text-xl italic text-[#C4D0C5]">&amp;</span>
+        {groom}
+      </h1>
+      {date && <p className="mt-5 font-playfair text-base">{date}</p>}
+
+      {guestName && (
+        <div className="mx-auto mt-8 max-w-[16rem]">
+          <ChalkStroke className="mx-auto text-[#C4D0C5]" />
+          <p className="mt-4 text-sm text-[#C4D0C5]">Kepada Yth.</p>
+          <p className="mt-1 break-words font-playfair text-xl">{guestName}</p>
+        </div>
+      )}
+
+      <button type="button" onClick={onOpen} className={`${BTN_BOARD} mt-8`}>
+        <Mail className="h-4 w-4" aria-hidden="true" />
+        Buka Undangan
+      </button>
+    </div>
+  </section>
+);
+
+/* ------------------------------------------------------------------- hero */
+
+const Hero: React.FC<{
+  invitation: DigitalInvitation;
+  photo: string | null;
+  bride: string;
+  groom: string;
+  date: string;
+}> = ({ invitation, photo, bride, groom, date }) => (
+  <section aria-label="Pembuka" className="px-6 pb-10 pt-12 text-center">
+    <p className={`font-playfair text-sm italic ${MUTED}`}>{invitation.title?.trim() || "The Wedding of"}</p>
+    <h1 className={`mt-2 break-words leading-[1.15] text-[#8B2E3F] ${SCRIPT} ${scriptSize(bride, groom)}`}>
+      {bride} &amp;&nbsp;{groom}
+    </h1>
+    {date && <p className="mt-3 font-playfair text-base text-[#2B2420]">{date}</p>}
+
+    {photo ? (
+      <figure className={`mx-auto mt-9 w-[86%] -rotate-1 bg-white p-2 pb-3 ${PHOTO_SHADOW}`}>
+        <div className="aspect-[4/5] overflow-hidden bg-[#EFE9DF]">
+          <img src={photo} alt={`Foto ${bride} dan ${groom}`} className="h-full w-full object-cover" />
+        </div>
+      </figure>
+    ) : (
+      <ChalkStroke className="mx-auto mt-6 text-[#4E6B50]" />
+    )}
+  </section>
+);
+
+/* ------------------------------------------------------------------ quote */
+
+const Quote: React.FC<{ text: string; source: string | null }> = ({ text, source }) => (
+  <section aria-label="Kutipan" className="px-8 py-10 text-center">
+    <Reveal>
+      <ChalkStroke className="mx-auto text-[#4E6B50]" />
+      <blockquote className="mt-6 text-pretty font-playfair text-lg italic leading-relaxed text-[#2B2420]">{text}</blockquote>
+      {source?.trim() && <p className="mt-4 text-sm font-semibold text-[#4E6B50]">{source}</p>}
+    </Reveal>
+  </section>
+);
+
+/* ---------------------------------------------------------------- mempelai */
+
+interface PersonProps {
+  role: "Putra" | "Putri";
+  nickName: string;
+  fullName: string | null;
+  photoUrl: string | null;
+  father: string | null;
+  mother: string | null;
+  instagram: string | null;
+  tilt: string;
+}
+
+const Person: React.FC<PersonProps> = ({ role, nickName, fullName, photoUrl, father, mother, instagram, tilt }) => {
+  const parents = [father?.trim(), mother?.trim()].filter(Boolean).join(" & ");
+  const igUrl = instagramHref(instagram);
+  const displayName = fullName?.trim() || nickName;
+  return (
+    <Reveal className="flex flex-col items-center text-center">
+      <figure className={`w-[62%] max-w-[15rem] bg-white p-2 pb-3 ${tilt} ${PHOTO_SHADOW}`}>
+        <div className="aspect-[3/4] overflow-hidden bg-[#EFE9DF]">
+          {photoUrl ? (
+            <img src={photoUrl} alt={`Foto ${displayName}`} loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            // Initial stands in for a missing portrait; never a stock photo of a stranger.
+            <div className={`flex h-full items-center justify-center text-7xl text-[#4E6B50] ${SCRIPT}`} aria-hidden="true">
+              {nickName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+      </figure>
+      <p className={`mt-6 break-words text-4xl leading-tight text-[#8B2E3F] ${SCRIPT}`}>{nickName}</p>
+      {displayName !== nickName && (
+        <h3 className="mt-1 max-w-full text-balance break-words font-playfair text-lg font-semibold tracking-normal text-[#2B2420]">
+          {displayName}
+        </h3>
+      )}
+      {parents && (
+        <p className={`mt-2 max-w-xs text-sm leading-relaxed ${MUTED}`}>
+          {role} dari <span className="text-[#2B2420]">{parents}</span>
+        </p>
+      )}
+      {igUrl && (
+        <a
+          href={igUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium text-[#4E6B50] hover:text-[#2B2420] ${FOCUS_PAPER}`}
+        >
+          <Instagram className="h-4 w-4" aria-hidden="true" />@{instagram?.trim().replace(/^@/, "")}
+        </a>
+      )}
+    </Reveal>
+  );
+};
+
+/* --------------------------------------------------------------- countdown */
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+const Countdown: React.FC<{ invitation: DigitalInvitation }> = ({ invitation }) => {
+  const target = getEventStart(invitation);
+  const { days, hours, minutes, seconds, isOver } = useCountdown(target);
+  if (!target) return null;
+  const units: Array<[string, number]> = [
+    ["Hari", days],
+    ["Jam", hours],
+    ["Menit", minutes],
+    ["Detik", seconds],
+  ];
+  return (
+    <section aria-labelledby="cv-countdown" className="relative px-6 py-12 text-center text-[#F4EFE6]">
+      <BoardSurface />
+      <div className="relative">
+        <h2 id="cv-countdown" className={`${SCRIPT} text-4xl leading-tight`}>
+          Menuju Hari Bahagia
+        </h2>
+        <ChalkStroke className="mx-auto mt-1 text-[#C4D0C5]" />
+        {isOver ? (
+          <p className="mt-6 font-playfair text-xl">Hari bahagia telah tiba.</p>
+        ) : (
+          <div className="mx-auto mt-7 grid max-w-xs grid-cols-4 gap-2">
+            {units.map(([label, value]) => (
+              <div key={label}>
+                <span className="block font-playfair text-4xl tabular-nums lining-nums">{pad2(value)}</span>
+                <span className="mt-1 block text-xs text-[#C4D0C5]">{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+/* ------------------------------------------------------------------ events */
+
+interface EventInfo {
+  label: string;
+  date: string | null;
+  start: string | null;
+  end: string | null;
+  venue: string | null;
+  address: string | null;
+  mapUrl: string | null;
+}
+
+const EventCard: React.FC<{ event: EventInfo; invitation: DigitalInvitation; couple: string }> = ({
+  event,
   invitation,
-  guestName = "",
-  audioRef,
-  isPlayingMusic,
-  toggleMusic,
-  onRsvpSubmit,
-  isSubmittingRsvp,
+  couple,
 }) => {
-  const [isOpenEnvelope, setIsOpenEnvelope] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [copiedAddress, setCopiedAddress] = useState(false);
-
-  // Gallery Lightbox Modal State
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  // RSVP Form State
-  const [rsvpName, setRsvpName] = useState(guestName);
-  const [attendance, setAttendance] = useState<"hadir" | "tidak_hadir" | "ragu">("hadir");
-  const [guestCount, setGuestCount] = useState(1);
-  const [message, setMessage] = useState("");
-
-  // Countdown timer logic
-  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number }>({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0,
-  });
-
-  useEffect(() => {
-    const targetDate = new Date(invitation.akadDate || invitation.resepsiDate || new Date()).getTime();
-    const updateTimer = () => {
-      const now = new Date().getTime();
-      const diff = targetDate - now;
-      if (diff > 0) {
-        setTimeLeft({
-          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((diff / (1000 * 60)) % 60),
-          seconds: Math.floor((diff / 1000) % 60),
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
-    };
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [invitation]);
-
-  const loveStories: LoveStoryItem[] = Array.isArray(invitation.loveStory)
-    ? invitation.loveStory
-    : typeof invitation.loveStory === "string"
-    ? JSON.parse(invitation.loveStory || "[]")
-    : [];
-
-  const gallery: GalleryPhotoItem[] = Array.isArray(invitation.galleryPhotos)
-    ? invitation.galleryPhotos
-    : typeof invitation.galleryPhotos === "string"
-    ? JSON.parse(invitation.galleryPhotos || "[]")
-    : [];
-
-  const bankAccounts: BankAccountItem[] = Array.isArray(invitation.bankAccounts)
-    ? invitation.bankAccounts
-    : typeof invitation.bankAccounts === "string"
-    ? JSON.parse(invitation.bankAccounts || "[]")
-    : [];
-
-  const rsvps: InvitationRsvp[] = invitation.rsvps || [];
-
-  const coverImage =
-    invitation.coverPhotoUrl ||
-    "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=1600&auto=format&fit=crop&q=85";
-
-  // Handle Opening Invitation
-  const handleOpen = () => {
-    setIsOpenEnvelope(true);
-    if (invitation.bgMusicUrl && audioRef.current) {
-      audioRef.current.play().catch(() => {});
-    }
+  const calendarEvent: CalendarEvent = {
+    title: `${event.label}: ${couple}`,
+    date: event.date,
+    startTime: event.start,
+    endTime: event.end,
+    timezone: invitation.timezone,
+    location: [event.venue, event.address].filter(Boolean).join(", "),
+    description: `Undangan pernikahan ${couple}`,
   };
+  const calendarUrl = googleCalendarUrl(calendarEvent);
+  const map = safeHref(event.mapUrl);
+  const date = formatEventDate(event.date);
 
-  // Copy account helper
-  const handleCopyAccount = (accNum: string, idx: number) => {
-    navigator.clipboard.writeText(accNum);
-    setCopiedIndex(idx);
-    toast.success("Nomor rekening berhasil disalin!", { description: accNum });
-    setTimeout(() => setCopiedIndex(null), 2500);
-  };
+  return (
+    <Reveal>
+      <article className={`p-6 text-center ${CARD}`}>
+        <h3 className="text-sm font-semibold tracking-normal text-[#4E6B50]">{event.label}</h3>
+        {date && (
+          <>
+            <p className="mt-3 font-playfair text-xl font-semibold leading-snug text-[#2B2420]">{date}</p>
+            <p className={`mt-1 text-sm ${MUTED}`}>{formatTimeRange(event.start, event.end, invitation.timezone)}</p>
+          </>
+        )}
+        {(event.venue || event.address) && (
+          <div className="mt-4 border-t border-[#D9D2C7] pt-4">
+            {event.venue && <p className="font-semibold text-[#2B2420]">{event.venue}</p>}
+            {event.address && <p className={`mt-1 text-sm leading-relaxed ${MUTED}`}>{event.address}</p>}
+          </div>
+        )}
+        {(map || calendarUrl) && (
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            {map && (
+              <a href={map} target="_blank" rel="noopener noreferrer" className={BTN_DARK}>
+                <MapPin className="h-4 w-4" aria-hidden="true" />
+                Buka Peta
+              </a>
+            )}
+            {calendarUrl && (
+              <>
+                <a href={calendarUrl} target="_blank" rel="noopener noreferrer" className={BTN_QUIET}>
+                  <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+                  Simpan ke Kalender
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (downloadIcs(calendarEvent)) toast.success("Kalender .ics berhasil diunduh");
+                  }}
+                  className={BTN_QUIET}
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                  Unduh .ics
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </article>
+    </Reveal>
+  );
+};
 
-  // Copy gift address
-  const handleCopyAddress = (addr: string) => {
-    navigator.clipboard.writeText(addr);
-    setCopiedAddress(true);
-    toast.success("Alamat berhasil disalin!", { description: addr });
-    setTimeout(() => setCopiedAddress(false), 2500);
-  };
+/* -------------------------------------------------------------- love story */
 
-  // Google Calendar URL Generator
-  const generateGoogleCalendarUrl = (title: string, dateStr?: string | null, startTime?: string | null, endTime?: string | null, location?: string | null) => {
-    if (!dateStr) return "#";
-    const dateFormatted = dateStr.split("T")[0].replace(/-/g, "");
-    const sTime = (startTime || "08:00").replace(":", "") + "00";
-    const eTime = (endTime || "12:00").replace(":", "") + "00";
-    const startIso = `${dateFormatted}T${sTime}`;
-    const endIso = `${dateFormatted}T${eTime}`;
-    const desc = `Undangan Pernikahan ${invitation.groomNickName || "Mempelai"} & ${invitation.brideNickName || "Mempelai"}`;
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startIso}/${endIso}&details=${encodeURIComponent(desc)}&location=${encodeURIComponent(location || "")}`;
-  };
+const LoveStory: React.FC<{ items: Array<{ year: string; title: string; story: string }> }> = ({ items }) => (
+  <section aria-labelledby="cv-story" className="px-6 py-12">
+    <SectionTitle title="Kisah Kami" id="cv-story" />
+    <ol className="mx-auto max-w-sm space-y-8 border-l border-[#D9D2C7] pl-6">
+      {items.map((item, i) => (
+        <li key={`${item.year}-${i}`} className="relative">
+          <span aria-hidden="true" className="absolute -left-[29px] top-2 h-2.5 w-2.5 rounded-full bg-[#4E6B50]" />
+          <Reveal>
+            <p className="font-playfair text-xl font-semibold lining-nums text-[#4E6B50]">{item.year}</p>
+            <h3 className="mt-1 font-playfair text-lg font-semibold tracking-normal text-[#2B2420]">{item.title}</h3>
+            <p className={`mt-1 text-pretty text-sm leading-relaxed ${MUTED}`}>{item.story}</p>
+          </Reveal>
+        </li>
+      ))}
+    </ol>
+  </section>
+);
 
-  // Apple Calendar (.ics) Generator
-  const downloadAppleCalendarIcs = (title: string, dateStr?: string | null, startTime?: string | null, endTime?: string | null, location?: string | null) => {
-    if (!dateStr) return;
-    const dateFormatted = dateStr.split("T")[0].replace(/-/g, "");
-    const sTime = (startTime || "08:00").replace(":", "") + "00";
-    const eTime = (endTime || "12:00").replace(":", "") + "00";
-    const icsContent = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Inveet Wedding//Chalk and Vow//ID",
-      "CALSCALE:GREGORIAN",
-      "BEGIN:VEVENT",
-      `SUMMARY:${title}`,
-      `DESCRIPTION:Pernikahan ${invitation.groomNickName} & ${invitation.brideNickName}`,
-      `LOCATION:${location || ""}`,
-      `DTSTART:${dateFormatted}T${sTime}`,
-      `DTEND:${dateFormatted}T${eTime}`,
-      "STATUS:CONFIRMED",
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n");
+/* ----------------------------------------------------------------- gallery */
 
-    const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `${title.replace(/\s+/g, "_")}.ics`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    toast.success("Kalender .ics berhasil diunduh!");
-  };
+const GALLERY_PREVIEW = 6;
 
-  // Submit RSVP handler
-  const handleSubmitRsvp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rsvpName.trim()) {
-      toast.error("Nama lengkap wajib diisi");
-      return;
-    }
+const Gallery: React.FC<{ items: GalleryPhotoItem[] }> = ({ items }) => {
+  const [open, setOpen] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const close = useCallback(() => setOpen(null), []);
+  const visible = showAll ? items : items.slice(0, GALLERY_PREVIEW);
+
+  return (
+    <section aria-labelledby="cv-gallery" className="px-6 py-12">
+      <SectionTitle title="Galeri" id="cv-gallery" />
+      <div className="grid grid-cols-2 gap-3">
+        {visible.map((item, i) => (
+          <button
+            key={`${item.url}-${i}`}
+            type="button"
+            onClick={() => setOpen(i)}
+            aria-label={`Buka foto ${i + 1}${item.caption ? `: ${item.caption}` : ""}`}
+            className={`bg-white p-1.5 ${PHOTO_SHADOW} ${FOCUS_PAPER}`}
+          >
+            <span className="block aspect-[4/5] overflow-hidden bg-[#EFE9DF]">
+              <img
+                src={item.url}
+                alt={item.caption || `Foto galeri ${i + 1}`}
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+      {!showAll && items.length > GALLERY_PREVIEW && (
+        <div className="mt-6 text-center">
+          <button type="button" onClick={() => setShowAll(true)} className={BTN_QUIET}>
+            Lihat semua foto ({items.length})
+          </button>
+        </div>
+      )}
+      {open !== null && <Lightbox items={items} index={open} tone={LIGHTBOX_TONE} onClose={close} onChange={setOpen} />}
+    </section>
+  );
+};
+
+/* -------------------------------------------------------------------- gift */
+
+interface GiftProps {
+  intro: string;
+  accounts: InvitationThemeProps["data"]["bankAccounts"];
+  address: string | null;
+}
+
+const Gift: React.FC<GiftProps> = ({ intro, accounts, address }) => {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copy = async (text: string, key: string, done: string) => {
     try {
-      await onRsvpSubmit({
-        guestName: rsvpName.trim(),
-        attendanceStatus: attendance,
-        guestCount,
-        message: message.trim(),
-      });
-      setMessage("");
-      toast.success("Konfirmasi & Doa Restu Terkirim!", {
-        description: "Terima kasih banyak atas partisipasi dan ucapan tulus Anda.",
-      });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Gagal mengirim konfirmasi");
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      toast.success(done, { description: text });
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 2500);
+    } catch {
+      toast.error("Tidak dapat menyalin. Salin secara manual.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#16241E] text-slate-800 antialiased selection:bg-rose-900/20 selection:text-[#8B2E3F]">
-      <Toaster position="top-center" richColors />
-
-      {/* Floating Audio Player Button (Fixed bottom-right) */}
-      <div className="fixed bottom-6 right-6 md:right-8 z-40">
-        <button
-          onClick={toggleMusic}
-          aria-label="Toggle Background Music"
-          className="w-12 h-12 rounded-full bg-[#16241E] border border-[#C4A882]/40 text-[#C4A882] shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-300 group backdrop-blur-md"
-        >
-          <div className={`relative flex items-center justify-center ${isPlayingMusic ? "animate-spin" : ""}`} style={{ animationDuration: "5s" }}>
-            <Music className="w-5 h-5" />
-          </div>
-          {isPlayingMusic && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-[#16241E] animate-pulse" />
-          )}
-        </button>
-      </div>
-
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* DESKTOP SPLIT VIEWPORT ARCHITECTURE */}
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* DESKTOP SPLIT VIEWPORT ARCHITECTURE (SEAMLESS - ZERO GAP)   */}
-      {/* ────────────────────────────────────────────────────────── */}
-      <div className="min-h-screen flex justify-end bg-[#16241E]">
-        {/* ======================================================== */}
-        {/* 1. LEFT PANEL: FIXED CHALKBOARD HERO (Hidden on Mobile) */}
-        {/* ======================================================== */}
-        <aside className="hidden md:flex flex-1 fixed inset-y-0 left-0 right-[460px] lg:right-[480px] bg-[#16241E] text-[#F0EBE3] select-none overflow-hidden flex-col justify-between p-10 lg:p-14 border-r border-[#22352C] shadow-2xl z-20">
-          {/* Official Inveet Chalk and Vow Background Layer */}
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-85 pointer-events-none"
-            style={{ backgroundImage: `url(${inveetChalkCover})` }}
-          />
-
-          {/* Subtle dark ambient scrim gradient for readability */}
-          <div className="absolute inset-0 bg-[#0F1C16]/35 pointer-events-none" />
-
-          {/* Top Brand Tag */}
-          <div className="relative z-10 space-y-1">
-            <span className="inline-block text-[11px] uppercase tracking-[0.28em] text-[#8CA68C] font-semibold">
-              The Digital Wedding Invitation
-            </span>
-            <p className="text-xs text-[#C4A882]/80 tracking-widest uppercase font-serif">
-              {invitation.title || "Chalk & Vow Edition"}
-            </p>
-          </div>
-
-          {/* Middle Center Canvas (Typography Masterpiece) */}
-          <div className="relative z-10 my-auto py-8 max-w-lg space-y-5 text-left">
-            <div className="w-16 h-0.5 bg-[#C4A882]/40 rounded-full" />
-            
-            <span className="text-xs uppercase tracking-[0.3em] text-[#C4877A] font-bold">
-              Walimatul 'Ursy
-            </span>
-
-            <div className="space-y-1.5">
-              <h1 className="font-great-vibes text-5xl lg:text-6xl text-[#FAF8F5] leading-tight tracking-wide drop-shadow-md">
-                {invitation.brideNickName || "Azalia Fasya"} &amp; {invitation.groomNickName || "Dias Taufik"}
-              </h1>
-              <p className="font-playfair text-lg text-[#C4A882] tracking-wider pt-1">
-                {invitation.akadDate ? formatDateIndo(invitation.akadDate) : "Tanggal Bahagia"}
-              </p>
-            </div>
-
-            {invitation.openingQuote && (
-              <blockquote className="text-xs lg:text-sm text-[#E8DDD0]/80 italic leading-relaxed border-l-2 border-[#C4877A]/40 pl-4 max-w-md font-serif">
-                "{invitation.openingQuote}"
-                {invitation.quoteSource && (
-                  <span className="block not-italic text-[11px] text-[#8CA68C] mt-2 font-sans tracking-wide">
-                    — {invitation.quoteSource}
-                  </span>
+    <section aria-labelledby="cv-gift" className="px-6 py-12">
+      <SectionTitle title="Tanda Kasih" id="cv-gift" lead={intro} />
+      <div className="space-y-4">
+        {accounts.map((acc, i) => {
+          const key = `${acc.bankName}-${acc.accountNumber}-${i}`;
+          return (
+            <Reveal key={key}>
+              <div className={`p-6 text-center ${CARD}`}>
+                <p className="text-sm font-semibold text-[#4E6B50]">{acc.bankName}</p>
+                <p className="mt-2 break-all font-playfair text-2xl font-semibold tabular-nums lining-nums text-[#2B2420]">
+                  {acc.accountNumber}
+                </p>
+                <p className={`mt-1 text-sm ${MUTED}`}>a.n. {acc.accountHolder}</p>
+                {acc.qrCodeUrl && (
+                  <img
+                    src={acc.qrCodeUrl}
+                    alt={`Kode QR ${acc.bankName}`}
+                    loading="lazy"
+                    className="mx-auto mt-4 h-28 w-28 border border-[#D9D2C7] bg-white p-1"
+                  />
                 )}
-              </blockquote>
-            )}
-          </div>
-
-          {/* Bottom Floating Identity Pill Card */}
-          <div className="relative z-10 flex items-center justify-between pt-6 border-t border-[#2A3E34]/80">
-            <div className="flex items-center gap-4 bg-[#0F1A15]/75 backdrop-blur-md px-6 py-3.5 rounded-full border border-[#C4A882]/30 shadow-lg">
-              <span className="font-great-vibes text-2xl text-[#C4A882]">Pernikahan</span>
-              <div className="w-px h-6 bg-[#2A3E34]" />
-              <div className="text-left">
-                <p className="font-playfair font-bold text-sm text-[#FAF8F5]">
-                  {invitation.brideNickName || "Azalia"} &amp; {invitation.groomNickName || "Dias"}
-                </p>
-                <p className="text-[10px] tracking-wider text-[#8CA68C] uppercase font-mono">
-                  {invitation.akadDate ? formatDateIndo(invitation.akadDate) : ""}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => void copy(acc.accountNumber, key, "Nomor rekening tersalin")}
+                  className={`${BTN_QUIET} mt-4`}
+                >
+                  {copied === key ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+                  {copied === key ? "Tersalin" : "Salin nomor rekening"}
+                </button>
               </div>
-            </div>
-            <p className="text-[10px] text-[#8CA68C]/70 tracking-widest uppercase font-mono">
-              Inveet • Chalk &amp; Vow
-            </p>
-          </div>
-        </aside>
-
-        {/* ======================================================== */}
-        {/* 2. RIGHT PANEL: SCROLLABLE MOBILE DEVICE CANVAS (480px)  */}
-        {/* ======================================================== */}
-        <main className="w-full md:w-[460px] lg:w-[480px] min-h-screen relative overflow-y-auto z-10 shadow-2xl md:border-l md:border-[#22352C] bg-[#FAF8F5] flex flex-col">
-          {/* Mobile Container (Fills Right Panel Exactly - No Awkward Gaps) */}
-          <div className="w-full min-h-screen bg-[#FAF8F5] relative flex flex-col">
-            
-            {/* ──────────────────────────────────────────────────── */}
-            {/* COVER / OPENING ENVELOPE (Matches Reference 1:1)     */}
-            {/* ──────────────────────────────────────────────────── */}
-            {!isOpenEnvelope ? (
-              <div className="min-h-screen relative flex flex-col justify-end p-6 sm:p-8 text-center text-[#FAF8F5] overflow-hidden select-none">
-                {/* Pristine Official Inveet Chalk Art Botanical + Double Gold Frame Background */}
-                <div
-                  className="absolute inset-0 bg-cover bg-center transition-transform duration-1000 scale-100"
-                  style={{ backgroundImage: `url(${inveetChalkCover})` }}
-                />
-
-                {/* Subtle dark ambient scrim gradient to guarantee text contrast */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0D1813]/85 via-transparent to-transparent pointer-events-none" />
-
-                {/* Lower-Middle Typography Group (Matching Reference Screenshot 1:1) */}
-                <div className="relative z-20 pb-6 sm:pb-8 space-y-4 max-w-sm mx-auto w-full">
-                  {/* Eyebrow: PERNIKAHAN */}
-                  <p className="text-[11px] uppercase tracking-[0.35em] text-[#C4D0C5] font-semibold font-sans">
-                    PERNIKAHAN
-                  </p>
-
-                  {/* Couple Names in Cursive Script (Bride & Groom) */}
-                  <div className="space-y-0.5 py-0.5">
-                    <h1 className="font-great-vibes text-4xl sm:text-5xl text-white drop-shadow-sm leading-tight">
-                      {invitation.brideNickName || "Azalia Fasya"}
-                    </h1>
-                    <p className="font-playfair italic text-xs text-[#D4AF37] my-0.5">&amp;</p>
-                    <h2 className="font-great-vibes text-4xl sm:text-5xl text-white drop-shadow-sm leading-tight">
-                      {invitation.groomNickName || "Dias Taufik"}
-                    </h2>
-                  </div>
-
-                  {/* Date with Flanking Horizontal Lines */}
-                  <div className="flex items-center justify-center gap-3 text-white/90 py-1">
-                    <div className="w-8 sm:w-10 h-px bg-white/40" />
-                    <p className="text-[10px] sm:text-[11px] font-sans font-medium uppercase tracking-[0.25em]">
-                      {invitation.akadDate
-                        ? formatDateIndo(invitation.akadDate).toUpperCase()
-                        : "RABU, 30 SEPTEMBER 2026"}
-                    </p>
-                    <div className="w-8 sm:w-10 h-px bg-white/40" />
-                  </div>
-
-                  {/* Guest Personalization Box (If ?to= is present) */}
-                  {guestName && (
-                    <div className="py-2 px-4 rounded-full bg-[#12221A]/85 border border-[#C4A882]/35 shadow-lg backdrop-blur-md max-w-xs mx-auto text-center flex items-center justify-center gap-1.5 animate-fade-in">
-                      <span className="text-[10px] text-[#A3B899] uppercase tracking-wider font-sans">
-                        Kepada Yth:
-                      </span>
-                      <span className="text-xs font-bold font-playfair text-[#FAF8F5]">{guestName}</span>
-                    </div>
-                  )}
-
-                  {/* Action Button: BUKA UNDANGAN (Pill Shape, Dark Green #1E342B, Mail Icon) */}
-                  <div className="pt-2">
-                    <button
-                      onClick={handleOpen}
-                      className="px-7 py-3 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-300 shadow-2xl flex items-center gap-2.5 mx-auto bg-[#1E342B] hover:bg-[#162720] text-white active:scale-95 border border-[#C4A882]/40 ring-1 ring-white/10"
-                    >
-                      <Mail className="w-4 h-4 text-white" />
-                      <span>Buka Undangan</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-
-              /* ──────────────────────────────────────────────────── */
-              /* INVITATION CONTENT BODY (Scrollable Inside Phone Frame) */
-              /* ──────────────────────────────────────────────────── */
-              <div
-                className="p-6 sm:p-8 space-y-14 animate-fade-in text-[#3D2B1F] bg-cover bg-top"
-                style={{ backgroundImage: `url(${inveetChalkWhiteboard})` }}
+            </Reveal>
+          );
+        })}
+        {address && (
+          <Reveal>
+            <div className={`p-6 text-center ${CARD}`}>
+              <p className="text-sm font-semibold text-[#4E6B50]">Alamat kirim kado</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[#2B2420]">{address}</p>
+              <button
+                type="button"
+                onClick={() => void copy(address, "address", "Alamat tersalin")}
+                className={`${BTN_QUIET} mt-4`}
               >
-                
-                {/* 1. HERO TOP SECTION */}
-                <section className="text-center pt-8 space-y-4">
-                  <span className="text-[11px] uppercase tracking-[0.28em] text-[#8CA68C] font-semibold">
-                    The Wedding Of
-                  </span>
-                  <h2 className="font-great-vibes text-5xl text-[#8B2E3F] leading-snug">
-                    {invitation.brideNickName || "Mempelai"} &amp; {invitation.groomNickName || "Mempelai"}
-                  </h2>
-                  <p className="font-playfair text-xs uppercase tracking-widest text-[#7A6E65]">
-                    {invitation.akadDate ? formatDateIndo(invitation.akadDate) : ""}
-                  </p>
-
-                  {/* Hero Prewedding Image with rounded-3xl and ivory border */}
-                  <div className="pt-2">
-                    <div className="relative aspect-4/5 w-full rounded-3xl overflow-hidden shadow-xl border-4 border-white">
-                      <img
-                        src={coverImage}
-                        alt="Couple Prewedding"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                      <div className="absolute bottom-4 inset-x-4 text-center text-white font-playfair text-sm italic">
-                        {invitation.title || "The Beginning of Forever"}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 2. QUOTE / AYAT SUCI SECTION */}
-                {invitation.openingQuote && (
-                  <section className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-7 border border-stone-200/80 shadow-xs text-center space-y-4">
-                    <div className="w-8 h-8 mx-auto rounded-full bg-rose-50 text-[#8B2E3F] flex items-center justify-center">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <blockquote className="font-playfair italic text-xs sm:text-sm text-[#5C4D44] leading-relaxed">
-                      "{invitation.openingQuote}"
-                    </blockquote>
-                    {invitation.quoteSource && (
-                      <p className="text-[11px] font-bold tracking-widest text-[#8CA68C] uppercase font-sans">
-                        {invitation.quoteSource}
-                      </p>
-                    )}
-                  </section>
+                {copied === "address" ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-4 w-4" aria-hidden="true" />
                 )}
-
-                {/* 3. MEMPELAI (GROOM & BRIDE) SECTION */}
-                <section className="space-y-8">
-                  <div className="text-center space-y-1.5">
-                    <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                      Pasangan Mempelai
-                    </span>
-                    <h3 className="font-playfair font-bold text-2xl sm:text-3xl text-[#16241E]">
-                      Mempelai Bahagia
-                    </h3>
-                    <p className="text-xs text-[#7A6E65] max-w-xs mx-auto">
-                      Dengan memohon rahmat dan ridho Allah SWT, kami mengundang Anda untuk merayakan ikatan suci kami:
-                    </p>
-                  </div>
-
-                  {/* Groom Card */}
-                  <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs text-center space-y-4">
-                    <div className="relative w-36 h-48 mx-auto rounded-2xl overflow-hidden shadow-md border-2 border-stone-100">
-                      <img
-                        src={invitation.groomPhotoUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800"}
-                        alt={invitation.groomFullName || "Mempelai Pria"}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h4 className="font-great-vibes text-3xl text-[#8B2E3F]">
-                        {invitation.groomNickName || "Mempelai Pria"}
-                      </h4>
-                      <p className="font-playfair font-bold text-base text-[#16241E] mt-0.5">
-                        {invitation.groomFullName || "Nama Lengkap Mempelai Pria"}
-                      </p>
-                      {(invitation.groomFather || invitation.groomMother) && (
-                        <p className="text-xs text-[#7A6E65] mt-1.5 leading-relaxed">
-                          Putra dari {invitation.groomFather ? `Bpk. ${invitation.groomFather}` : ""}{" "}
-                          {invitation.groomMother ? `& Ibu ${invitation.groomMother}` : ""}
-                        </p>
-                      )}
-                      {invitation.groomInstagram && (
-                        <a
-                          href={`https://instagram.com/${invitation.groomInstagram.replace("@", "")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-[#8B2E3F] hover:underline mt-2 font-medium"
-                        >
-                          <Instagram className="w-3.5 h-3.5" />
-                          <span>{invitation.groomInstagram}</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Botanical Ampersand Divider */}
-                  <div className="flex items-center justify-center gap-3">
-                    <div className="w-16 h-px bg-stone-300" />
-                    <span className="font-great-vibes text-4xl text-[#C4877A]">&amp;</span>
-                    <div className="w-16 h-px bg-stone-300" />
-                  </div>
-
-                  {/* Bride Card */}
-                  <div className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs text-center space-y-4">
-                    <div className="relative w-36 h-48 mx-auto rounded-2xl overflow-hidden shadow-md border-2 border-stone-100">
-                      <img
-                        src={invitation.bridePhotoUrl || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800"}
-                        alt={invitation.brideFullName || "Mempelai Wanita"}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h4 className="font-great-vibes text-3xl text-[#8B2E3F]">
-                        {invitation.brideNickName || "Mempelai Wanita"}
-                      </h4>
-                      <p className="font-playfair font-bold text-base text-[#16241E] mt-0.5">
-                        {invitation.brideFullName || "Nama Lengkap Mempelai Wanita"}
-                      </p>
-                      {(invitation.brideFather || invitation.brideMother) && (
-                        <p className="text-xs text-[#7A6E65] mt-1.5 leading-relaxed">
-                          Putri dari {invitation.brideFather ? `Bpk. ${invitation.brideFather}` : ""}{" "}
-                          {invitation.brideMother ? `& Ibu ${invitation.brideMother}` : ""}
-                        </p>
-                      )}
-                      {invitation.brideInstagram && (
-                        <a
-                          href={`https://instagram.com/${invitation.brideInstagram.replace("@", "")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs text-[#8B2E3F] hover:underline mt-2 font-medium"
-                        >
-                          <Instagram className="w-3.5 h-3.5" />
-                          <span>{invitation.brideInstagram}</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </section>
-
-                {/* 4. COUNTDOWN & ACARA (AKAD & RESEPSI) */}
-                <section className="space-y-8">
-                  <div className="text-center space-y-1.5">
-                    <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                      Jadwal Pernikahan
-                    </span>
-                    <h3 className="font-playfair font-bold text-2xl sm:text-3xl text-[#16241E]">
-                      Hari Bahagia
-                    </h3>
-                  </div>
-
-                  {/* Countdown Timer Block */}
-                  <div className="grid grid-cols-4 gap-2.5 text-center">
-                    {[
-                      { label: "Hari", val: timeLeft.days },
-                      { label: "Jam", val: timeLeft.hours },
-                      { label: "Menit", val: timeLeft.minutes },
-                      { label: "Detik", val: timeLeft.seconds },
-                    ].map((item, i) => (
-                      <div
-                        key={i}
-                        className="bg-white rounded-2xl p-3 border border-stone-200/80 shadow-xs"
-                      >
-                        <p className="font-playfair font-bold text-2xl text-[#8B2E3F] leading-none">
-                          {String(item.val).padStart(2, "0")}
-                        </p>
-                        <p className="text-[9px] uppercase tracking-wider text-[#7A6E65] mt-1 font-semibold">
-                          {item.label}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Akad Card */}
-                  <div className="bg-white rounded-3xl p-6 sm:p-7 border border-stone-200/80 shadow-xs space-y-4 text-center">
-                    <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-rose-50 text-[#8B2E3F] border border-rose-200">
-                      Akad Nikah
-                    </div>
-                    <h4 className="font-playfair font-bold text-xl text-[#16241E]">
-                      {invitation.akadDate ? formatDateIndo(invitation.akadDate) : "Tanggal Akad"}
-                    </h4>
-                    
-                    <div className="flex items-center justify-center gap-2 text-xs text-[#7A6E65]">
-                      <Clock className="w-3.5 h-3.5 text-[#8B2E3F]" />
-                      <span>
-                        Pukul {invitation.akadStartTime || "08:00"} - {invitation.akadEndTime || "10:00"} WIB
-                      </span>
-                    </div>
-
-                    <div className="space-y-1 pt-1">
-                      <p className="font-bold text-xs text-[#16241E]">
-                        {invitation.akadVenueName || "Tempat Akad Nikah"}
-                      </p>
-                      <p className="text-xs text-[#7A6E65] leading-relaxed max-w-xs mx-auto">
-                        {invitation.akadAddress || "Alamat lengkap lokasi akad"}
-                      </p>
-                    </div>
-
-                    {/* Three Capsule Action Buttons */}
-                    <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
-                      {invitation.akadMapUrl && (
-                        <a
-                          href={invitation.akadMapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#16241E] text-white hover:bg-[#22352C] transition-all flex items-center gap-1.5 shadow-xs"
-                        >
-                          <MapPin className="w-3 h-3 text-[#C4A882]" />
-                          <span>Lihat Lokasi</span>
-                        </a>
-                      )}
-                      
-                      <a
-                        href={generateGoogleCalendarUrl(
-                          `Akad Nikah: ${invitation.groomNickName} & ${invitation.brideNickName}`,
-                          invitation.akadDate,
-                          invitation.akadStartTime,
-                          invitation.akadEndTime,
-                          invitation.akadVenueName
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 rounded-full text-[11px] font-semibold text-[#16241E] bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-all flex items-center gap-1.5"
-                      >
-                        <CalendarPlus className="w-3 h-3 text-[#8B2E3F]" />
-                        <span>Google Cal</span>
-                      </a>
-
-                      <button
-                        onClick={() =>
-                          downloadAppleCalendarIcs(
-                            `Akad Nikah: ${invitation.groomNickName} & ${invitation.brideNickName}`,
-                            invitation.akadDate,
-                            invitation.akadStartTime,
-                            invitation.akadEndTime,
-                            invitation.akadVenueName
-                          )
-                        }
-                        className="px-3.5 py-2 rounded-full text-[11px] font-semibold text-[#16241E] bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-all flex items-center gap-1.5"
-                      >
-                        <CalendarIcon className="w-3 h-3 text-[#8CA68C]" />
-                        <span>Apple Cal</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Resepsi Card */}
-                  <div className="bg-white rounded-3xl p-6 sm:p-7 border border-stone-200/80 shadow-xs space-y-4 text-center">
-                    <div className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-50 text-emerald-800 border border-emerald-200">
-                      Resepsi Pernikahan
-                    </div>
-                    <h4 className="font-playfair font-bold text-xl text-[#16241E]">
-                      {invitation.resepsiDate ? formatDateIndo(invitation.resepsiDate) : "Tanggal Resepsi"}
-                    </h4>
-                    
-                    <div className="flex items-center justify-center gap-2 text-xs text-[#7A6E65]">
-                      <Clock className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>
-                        Pukul {invitation.resepsiStartTime || "11:00"} - {invitation.resepsiEndTime || "14:00"} WIB
-                      </span>
-                    </div>
-
-                    <div className="space-y-1 pt-1">
-                      <p className="font-bold text-xs text-[#16241E]">
-                        {invitation.resepsiVenueName || "Tempat Resepsi Pernikahan"}
-                      </p>
-                      <p className="text-xs text-[#7A6E65] leading-relaxed max-w-xs mx-auto">
-                        {invitation.resepsiAddress || "Alamat lengkap lokasi resepsi"}
-                      </p>
-                    </div>
-
-                    {/* Three Capsule Action Buttons */}
-                    <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
-                      {invitation.resepsiMapUrl && (
-                        <a
-                          href={invitation.resepsiMapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#16241E] text-white hover:bg-[#22352C] transition-all flex items-center gap-1.5 shadow-xs"
-                        >
-                          <MapPin className="w-3 h-3 text-[#C4A882]" />
-                          <span>Lihat Lokasi</span>
-                        </a>
-                      )}
-                      
-                      <a
-                        href={generateGoogleCalendarUrl(
-                          `Resepsi: ${invitation.groomNickName} & ${invitation.brideNickName}`,
-                          invitation.resepsiDate,
-                          invitation.resepsiStartTime,
-                          invitation.resepsiEndTime,
-                          invitation.resepsiVenueName
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 rounded-full text-[11px] font-semibold text-[#16241E] bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-all flex items-center gap-1.5"
-                      >
-                        <CalendarPlus className="w-3 h-3 text-[#8B2E3F]" />
-                        <span>Google Cal</span>
-                      </a>
-
-                      <button
-                        onClick={() =>
-                          downloadAppleCalendarIcs(
-                            `Resepsi: ${invitation.groomNickName} & ${invitation.brideNickName}`,
-                            invitation.resepsiDate,
-                            invitation.resepsiStartTime,
-                            invitation.resepsiEndTime,
-                            invitation.resepsiVenueName
-                          )
-                        }
-                        className="px-3.5 py-2 rounded-full text-[11px] font-semibold text-[#16241E] bg-stone-100 hover:bg-stone-200 border border-stone-200 transition-all flex items-center gap-1.5"
-                      >
-                        <CalendarIcon className="w-3 h-3 text-[#8CA68C]" />
-                        <span>Apple Cal</span>
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 5. LOVE STORY SECTION (Inveet Signature Row Layout) */}
-                {loveStories.length > 0 && (
-                  <section className="space-y-8">
-                    <div className="text-center space-y-1.5">
-                      <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                        Our Story
-                      </span>
-                      <h3 className="font-playfair font-bold text-2xl sm:text-3xl text-[#16241E]">
-                        Kisah Cinta Kami
-                      </h3>
-                      <p className="text-xs text-[#7A6E65]">
-                        Rangkaian kenangan indah yang mempertemukan kami
-                      </p>
-                    </div>
-
-                    <div className="space-y-6">
-                      {loveStories.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-white rounded-3xl p-6 border border-stone-200/80 shadow-xs relative overflow-hidden flex flex-col sm:flex-row gap-5 items-center sm:items-start"
-                        >
-                          {/* Translucent Giant Watermark Year on the Right */}
-                          <div className="absolute top-2 right-4 font-playfair font-black text-6xl sm:text-7xl text-[#16241E]/5 select-none pointer-events-none">
-                            {item.year}
-                          </div>
-
-                          {/* 3:4 Portrait Photo on the Left */}
-                          <div className="w-28 h-36 shrink-0 rounded-2xl overflow-hidden shadow-sm border border-stone-100">
-                            <img
-                              src={
-                                gallery[idx % gallery.length]?.url ||
-                                coverImage
-                              }
-                              alt={item.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-
-                          {/* Story Narrative on Right */}
-                          <div className="flex-1 text-center sm:text-left space-y-2 z-10">
-                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#8CA68C]/15 text-[#375337] tracking-wider">
-                              Tahun {item.year}
-                            </span>
-                            <h4 className="font-playfair font-bold text-base text-[#16241E]">
-                              {item.title}
-                            </h4>
-                            <p className="text-xs text-[#5C4D44] leading-relaxed">
-                              {item.story}
-                            </p>
-                            
-                            {/* Chalk Foliage Heart Ornament */}
-                            <div className="pt-2 flex items-center justify-center sm:justify-start gap-1.5 text-[#C4877A]/60">
-                              <span className="text-xs">❦</span>
-                              <div className="w-10 h-px bg-stone-200" />
-                              <Heart className="w-3 h-3 fill-[#C4877A]" />
-                              <div className="w-10 h-px bg-stone-200" />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
-
-                {/* 6. PHOTO GALLERY (2-Column Grid + Lightbox Modal) */}
-                {gallery.length > 0 && (
-                  <section className="space-y-6">
-                    <div className="text-center space-y-1.5">
-                      <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                        Gallery
-                      </span>
-                      <h3 className="font-playfair font-bold text-2xl sm:text-3xl text-[#16241E]">
-                        Momen Bahagia
-                      </h3>
-                      <p className="text-xs text-[#7A6E65]">
-                        Potret cinta dalam bingkai kebahagiaan
-                      </p>
-                    </div>
-
-                    {/* Symmetric 2-Column Grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {gallery.slice(0, 6).map((photo, idx) => (
-                        <div
-                          key={idx}
-                          onClick={() => setLightboxIndex(idx)}
-                          className="group relative aspect-4/5 rounded-2xl overflow-hidden cursor-pointer shadow-xs border-2 border-white hover:shadow-md transition-all duration-300"
-                        >
-                          <img
-                            src={photo.url}
-                            alt={photo.caption || `Gallery ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center text-white text-xs font-semibold">
-                            Buka Foto
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Expand Capsule Button */}
-                    <div className="text-center pt-2">
-                      <button
-                        onClick={() => setLightboxIndex(0)}
-                        className="px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider bg-white border border-stone-300 hover:bg-stone-50 text-[#16241E] shadow-xs transition-all active:scale-95"
-                      >
-                        Lihat Semua Foto ({gallery.length})
-                      </button>
-                    </div>
-                  </section>
-                )}
-
-                {/* 7. LOVE GIFT / AMPLOP DIGITAL */}
-                {(bankAccounts.length > 0 || invitation.giftAddress) && (
-                  <section className="bg-white rounded-3xl p-6 sm:p-7 border border-stone-200/80 shadow-xs text-center space-y-6">
-                    <div className="space-y-1.5">
-                      <div className="w-10 h-10 mx-auto rounded-full bg-rose-50 text-[#8B2E3F] flex items-center justify-center">
-                        <Gift className="w-5 h-5" />
-                      </div>
-                      <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                        Tanda Kasih
-                      </span>
-                      <h3 className="font-playfair font-bold text-2xl text-[#16241E]">
-                        Amplop Digital
-                      </h3>
-                      <p className="text-xs text-[#7A6E65] max-w-xs mx-auto">
-                        Doa restu Anda merupakan karunia terindah bagi kami. Namun jika ingin memberikan tanda kasih:
-                      </p>
-                    </div>
-
-                    {/* Bank Accounts */}
-                    <div className="space-y-4">
-                      {bankAccounts.map((acc, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-stone-50/80 rounded-2xl p-4 border border-stone-200/80 space-y-2 text-left"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold tracking-wider uppercase text-[#8B2E3F]">
-                              {acc.bankName}
-                            </span>
-                            <span className="text-[10px] text-[#7A6E65] font-mono">Transfer Bank</span>
-                          </div>
-                          <p className="font-mono text-base font-bold text-[#16241E] tracking-wider">
-                            {acc.accountNumber}
-                          </p>
-                          <p className="text-xs text-[#5C4D44]">a.n. {acc.accountHolder}</p>
-                          <button
-                            onClick={() => handleCopyAccount(acc.accountNumber, idx)}
-                            className="w-full mt-2 py-2 rounded-xl text-xs font-bold bg-white border border-stone-200 hover:bg-stone-100 transition-all flex items-center justify-center gap-1.5 active:scale-98 shadow-2xs"
-                          >
-                            {copiedIndex === idx ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                <span className="text-emerald-700">Tersalin!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5 text-[#8B2E3F]" />
-                                <span>Salin No. Rekening</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Physical Gift Address */}
-                    {invitation.giftAddress && (
-                      <div className="pt-4 border-t border-stone-100 text-left space-y-2">
-                        <p className="text-xs font-bold text-[#16241E] flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-[#8B2E3F]" />
-                          <span>Kirim Kado Fisik ke Alamat:</span>
-                        </p>
-                        <p className="text-xs text-[#5C4D44] bg-stone-50 p-3 rounded-xl border border-stone-200 leading-relaxed">
-                          {invitation.giftAddress}
-                        </p>
-                        <button
-                          onClick={() => handleCopyAddress(invitation.giftAddress!)}
-                          className="text-[11px] font-semibold text-[#8B2E3F] hover:underline flex items-center gap-1"
-                        >
-                          {copiedAddress ? "Alamat Tersalin!" : "Salin Alamat Kado"}
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                )}
-
-                {/* 8. RSVP & UCAPAN BUKU TAMU */}
-                <section className="space-y-6">
-                  <div className="text-center space-y-1.5">
-                    <span className="text-[11px] uppercase tracking-[0.25em] text-[#8CA68C] font-semibold">
-                      Konfirmasi &amp; Doa Restu
-                    </span>
-                    <h3 className="font-playfair font-bold text-2xl sm:text-3xl text-[#16241E]">
-                      Buku Tamu Online
-                    </h3>
-                  </div>
-
-                  {/* Form Card */}
-                  <form
-                    onSubmit={handleSubmitRsvp}
-                    className="bg-white rounded-3xl p-6 sm:p-7 border border-stone-200/80 shadow-xs space-y-4"
-                  >
-                    <div>
-                      <label className="block text-xs font-bold text-[#16241E] mb-1">
-                        Nama Lengkap
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-[#8B2E3F] transition-all"
-                        placeholder="Nama Anda..."
-                        value={rsvpName}
-                        onChange={(e) => setRsvpName(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Attendance Radio Pills */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#16241E] mb-1.5">
-                        Konfirmasi Kehadiran
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { id: "hadir", label: "Hadir", icon: CheckCircle2, color: "text-emerald-700 bg-emerald-50 border-emerald-300" },
-                          { id: "tidak_hadir", label: "Berhalangan", icon: XCircle, color: "text-rose-700 bg-rose-50 border-rose-300" },
-                          { id: "ragu", label: "Masih Ragu", icon: HelpCircle, color: "text-amber-700 bg-amber-50 border-amber-300" },
-                        ].map((tab) => {
-                          const isSel = attendance === tab.id;
-                          return (
-                            <button
-                              key={tab.id}
-                              type="button"
-                              onClick={() => setAttendance(tab.id as any)}
-                              className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center gap-1 ${
-                                isSel ? tab.color + " ring-1 ring-[#8B2E3F]" : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                              }`}
-                            >
-                              <tab.icon className="w-4 h-4" />
-                              <span className="text-[11px]">{tab.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {attendance === "hadir" && (
-                      <div>
-                        <label className="block text-xs font-bold text-[#16241E] mb-1">
-                          Jumlah Tamu Hadir
-                        </label>
-                        <select
-                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-[#8B2E3F]"
-                          value={guestCount}
-                          onChange={(e) => setGuestCount(Number(e.target.value))}
-                        >
-                          <option value={1}>1 Orang Tamu</option>
-                          <option value={2}>2 Orang Tamu</option>
-                          <option value={3}>3 Orang Tamu</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-bold text-[#16241E] mb-1">
-                        Doa Restu &amp; Pesan untuk Mempelai
-                      </label>
-                      <textarea
-                        rows={3}
-                        required
-                        className="w-full p-3.5 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-[#8B2E3F] transition-all"
-                        placeholder="Tuliskan ucapan selamat dan doa restu terbaik Anda..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmittingRsvp}
-                      className="w-full py-3.5 rounded-full text-xs font-bold uppercase tracking-wider bg-[#8B2E3F] hover:bg-[#722332] text-white transition-all shadow-md active:scale-98 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isSubmittingRsvp ? (
-                        <span>Mengirimkan...</span>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Kirim Doa Restu</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-
-                  {/* Wishes List */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between px-2">
-                      <span className="text-xs font-bold text-[#16241E]">
-                        Ucapan Terbaru ({rsvps.length})
-                      </span>
-                      <span className="text-[10px] text-[#8CA68C] uppercase font-semibold tracking-wider">
-                        Live Wishes
-                      </span>
-                    </div>
-
-                    {rsvps.length === 0 ? (
-                      <div className="p-8 text-center bg-white rounded-3xl border border-stone-200/80 text-xs text-[#7A6E65]">
-                        Belum ada ucapan doa. Jadilah yang pertama memberikan restu!
-                      </div>
-                    ) : (
-                      rsvps.map((rsvp, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-white rounded-2xl p-4 border border-stone-200/80 shadow-2xs space-y-2"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2.5">
-                              {/* Avatar with Sender Initial */}
-                              <div className="w-8 h-8 rounded-full bg-[#16241E] text-[#C4A882] flex items-center justify-center text-xs font-bold font-serif shrink-0">
-                                {rsvp.guestName?.charAt(0).toUpperCase() || "T"}
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold text-[#16241E] leading-tight">
-                                  {rsvp.guestName}
-                                </p>
-                                <span className="text-[10px] text-[#7A6E65]">
-                                  {new Date(rsvp.createdAt).toLocaleDateString("id-ID", {
-                                    day: "numeric",
-                                    month: "short",
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Attendance Badge */}
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                rsvp.attendanceStatus === "hadir"
-                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                  : rsvp.attendanceStatus === "tidak_hadir"
-                                  ? "bg-rose-50 text-rose-800 border border-rose-200"
-                                  : "bg-amber-50 text-amber-800 border border-amber-200"
-                              }`}
-                            >
-                              {rsvp.attendanceStatus === "hadir" ? "Hadir" : rsvp.attendanceStatus === "tidak_hadir" ? "Berhalangan" : "Ragu"}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-[#5C4D44] leading-relaxed pl-10">
-                            {rsvp.message}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-
-                {/* 9. FOOTER SECTION */}
-                <footer className="text-center pt-8 pb-12 space-y-3 border-t border-stone-200/80">
-                  <h5 className="font-great-vibes text-4xl text-[#8B2E3F]">
-                    {invitation.brideNickName || "Mempelai"} &amp; {invitation.groomNickName || "Mempelai"}
-                  </h5>
-                  <p className="text-xs text-[#7A6E65]">
-                    Terima kasih atas segala doa restu yang Anda berikan.
-                  </p>
-                  <p className="text-[10px] text-[#8CA68C] tracking-widest uppercase font-mono pt-4">
-                    Powered by Inveet • Wedding Platform
-                  </p>
-                </footer>
-
-              </div>
-            )}
-          </div>
-        </main>
+                {copied === "address" ? "Tersalin" : "Salin alamat"}
+              </button>
+            </div>
+          </Reveal>
+        )}
       </div>
+    </section>
+  );
+};
 
-      {/* ────────────────────────────────────────────────────────── */}
-      {/* 3. LIGHTBOX FULLSCREEN MODAL (Local State) */}
-      {/* ────────────────────────────────────────────────────────── */}
-      {lightboxIndex !== null && gallery[lightboxIndex] && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-8 animate-fade-in select-none">
-          {/* Top Bar */}
-          <div className="flex items-center justify-between text-white z-10">
-            <span className="text-xs font-mono tracking-wider opacity-75">
-              {lightboxIndex + 1} / {gallery.length}
-            </span>
-            <button
-              onClick={() => setLightboxIndex(null)}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+/* -------------------------------------------------------------------- rsvp */
+
+const ATTENDANCE: Array<{ value: AttendanceStatus; label: string }> = [
+  { value: "hadir", label: "Hadir" },
+  { value: "tidak_hadir", label: "Tidak hadir" },
+  { value: "ragu", label: "Masih ragu" },
+];
+
+const STATUS_TEXT: Record<AttendanceStatus, string> = {
+  hadir: "text-emerald-800",
+  tidak_hadir: "text-rose-800",
+  ragu: "text-amber-800",
+};
+
+const formatWishDate = (iso: string): string => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(d);
+};
+
+const Rsvp: React.FC<Pick<InvitationThemeProps, "data" | "guest" | "rsvp">> = ({ data, guest, rsvp }) => {
+  const form = useRsvpForm({ initialName: guest?.name, onSubmit: rsvp.submit });
+  const labelCls = "mb-2 block text-sm font-semibold text-[#2B2420]";
+  const hintCls = `ml-1 font-normal ${MUTED}`;
+
+  return (
+    <section aria-labelledby="cv-rsvp" className="px-6 py-12">
+      <SectionTitle title="Konfirmasi Kehadiran" id="cv-rsvp" />
+      <form onSubmit={(e) => void form.handleRsvpSubmit(e)} className={`space-y-5 p-6 ${CARD}`}>
+        <div>
+          <label htmlFor="cv-rsvp-name" className={labelCls}>
+            Nama<span className={hintCls}>(wajib)</span>
+          </label>
+          <input
+            id="cv-rsvp-name"
+            type="text"
+            autoComplete="name"
+            enterKeyHint="next"
+            required
+            maxLength={100}
+            value={form.rsvpName}
+            onChange={(e) => form.setRsvpName(e.target.value)}
+            placeholder="Nama lengkap Anda"
+            className={FIELD}
+          />
+        </div>
+
+        <fieldset>
+          <legend className={labelCls}>Kehadiran</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {ATTENDANCE.map((opt) => (
+              <label key={opt.value} className="block cursor-pointer">
+                <input
+                  type="radio"
+                  name="cv-rsvp-attendance"
+                  value={opt.value}
+                  checked={form.attendance === opt.value}
+                  onChange={() => form.setAttendance(opt.value)}
+                  className="peer sr-only"
+                />
+                <span className="flex min-h-[44px] items-center justify-center rounded-lg border border-[#8A7F74] bg-white px-1 text-center text-sm font-medium text-[#2B2420] transition-colors peer-checked:border-[#16241E] peer-checked:bg-[#16241E] peer-checked:font-semibold peer-checked:text-[#F4EFE6] peer-focus-visible:ring-2 peer-focus-visible:ring-[#8B2E3F] peer-focus-visible:ring-offset-2">
+                  {opt.label}
+                </span>
+              </label>
+            ))}
           </div>
+        </fieldset>
 
-          {/* Main Photo Display */}
-          <div className="relative my-auto flex items-center justify-center max-h-[80vh] w-full">
-            <img
-              src={gallery[lightboxIndex].url}
-              alt={gallery[lightboxIndex].caption || "Gallery Preview"}
-              className="max-h-[80vh] max-w-full object-contain rounded-2xl shadow-2xl"
-            />
-            {gallery[lightboxIndex].caption && (
-              <div className="absolute bottom-4 inset-x-0 text-center">
-                <span className="inline-block px-4 py-1.5 rounded-full bg-black/60 backdrop-blur-md text-xs text-white">
-                  {gallery[lightboxIndex].caption}
+        {form.attendance === "hadir" && (
+          <div>
+            <label htmlFor="cv-rsvp-count" className={labelCls}>
+              Jumlah tamu
+            </label>
+            <select
+              id="cv-rsvp-count"
+              value={form.guestCount}
+              onChange={(e) => form.setGuestCount(Number(e.target.value))}
+              className={FIELD}
+            >
+              {[1, 2, 3, 4].map((n) => (
+                <option key={n} value={n}>
+                  {n} orang
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="cv-rsvp-msg" className={labelCls}>
+            Ucapan dan doa<span className={hintCls}>(opsional)</span>
+          </label>
+          <textarea
+            id="cv-rsvp-msg"
+            rows={4}
+            maxLength={500}
+            value={form.message}
+            onChange={(e) => form.setMessage(e.target.value)}
+            placeholder="Tulis ucapan untuk kedua mempelai"
+            className={`${FIELD} resize-none py-3`}
+          />
+        </div>
+
+        <button type="submit" disabled={rsvp.isPending} className={`${BTN_PRIMARY} w-full`}>
+          <Send className="h-4 w-4" aria-hidden="true" />
+          {rsvp.isPending ? "Mengirim..." : "Kirim konfirmasi"}
+        </button>
+      </form>
+
+      <h3 className="mt-10 text-center font-playfair text-xl font-semibold tracking-normal text-[#2B2420]">
+        Ucapan dari tamu ({data.rsvpTotal})
+      </h3>
+      {data.rsvps.length === 0 ? (
+        <p className={`mx-auto mt-3 max-w-xs text-center text-sm leading-relaxed ${MUTED}`}>
+          Belum ada ucapan. Isi formulir di atas untuk menjadi yang pertama.
+        </p>
+      ) : (
+        <ul className="mt-3 max-h-[28rem] divide-y divide-[#D9D2C7] overflow-y-auto pr-1">
+          {data.rsvps.map((r) => (
+            <li key={r.id} className="py-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <p className="break-words font-semibold text-[#2B2420]">{r.guestName}</p>
+                <span className={`text-xs font-semibold ${STATUS_TEXT[r.attendanceStatus]}`}>
+                  {r.attendanceStatus === "hadir"
+                    ? `Hadir (${r.guestCount} orang)`
+                    : r.attendanceStatus === "tidak_hadir"
+                    ? "Tidak hadir"
+                    : "Masih ragu"}
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Bottom Controls */}
-          <div className="flex items-center justify-center gap-4 text-white z-10 pb-4">
-            <button
-              onClick={() => setLightboxIndex((lightboxIndex - 1 + gallery.length) % gallery.length)}
-              className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setLightboxIndex((lightboxIndex + 1) % gallery.length)}
-              className="p-3 rounded-full bg-white/10 hover:bg-white/20 transition-all active:scale-95"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+              {r.message?.trim() && (
+                <p className={`mt-1 whitespace-pre-line break-words text-sm leading-relaxed ${MUTED}`}>{r.message}</p>
+              )}
+              {formatWishDate(r.createdAt) && <p className={`mt-1 text-xs ${MUTED}`}>{formatWishDate(r.createdAt)}</p>}
+            </li>
+          ))}
+        </ul>
       )}
+    </section>
+  );
+};
+
+/* ------------------------------------------------------------------- music */
+
+const MusicButton: React.FC<{ isPlaying: boolean; onToggle: () => void }> = ({ isPlaying, onToggle }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-label={isPlaying ? "Jeda musik latar" : "Putar musik latar"}
+    className={`fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-[#C4A882] bg-[#16241E] text-[#F4EFE6] ${PHOTO_SHADOW} hover:bg-[#22352C] ${FOCUS_BOARD}`}
+  >
+    <span className="flex h-5 items-end gap-[3px]" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`w-[3px] rounded-full bg-current ${isPlaying ? "cv-eq h-full" : "h-1.5"}`}
+          style={isPlaying ? { animationDelay: `${i * 0.15}s` } : undefined}
+        />
+      ))}
+    </span>
+  </button>
+);
+
+/* -------------------------------------------------------------------- root */
+
+export const ChalkAndVowTheme: React.FC<InvitationThemeProps> = ({ data, guest, music, copy, rsvp }) => {
+  const { invitation } = data;
+  const [opened, setOpened] = useState(false);
+  const bride = nick(invitation.brideNickName, "Mempelai Wanita");
+  const groom = nick(invitation.groomNickName, "Mempelai Pria");
+  const couple = `${bride} & ${groom}`;
+  const date = formatEventDate(invitation.akadDate ?? invitation.resepsiDate);
+  const quote = invitation.openingQuote?.trim() || null;
+
+  const heroPhoto = invitation.heroPhotoUrl || invitation.coverPhotoUrl || null;
+
+  // Warm the opening photo while the cover is still showing.
+  useEffect(() => {
+    if (!heroPhoto) return;
+    const img = new Image();
+    img.src = heroPhoto;
+  }, [heroPhoto]);
+
+  const handleOpen = () => {
+    setOpened(true);
+    music.start();
+    window.scrollTo(0, 0);
+  };
+
+  const events: EventInfo[] = [
+    {
+      label: copy.ceremonyLabel,
+      date: invitation.akadDate,
+      start: invitation.akadStartTime,
+      end: invitation.akadEndTime,
+      venue: invitation.akadVenueName,
+      address: invitation.akadAddress,
+      mapUrl: invitation.akadMapUrl,
+    },
+    {
+      label: copy.receptionLabel,
+      date: invitation.resepsiDate,
+      start: invitation.resepsiStartTime,
+      end: invitation.resepsiEndTime,
+      venue: invitation.resepsiVenueName,
+      address: invitation.resepsiAddress,
+      mapUrl: invitation.resepsiMapUrl,
+    },
+  ].filter((e) => e.date || e.venue);
+
+  const hasGift = data.bankAccounts.length > 0 || Boolean(invitation.giftAddress?.trim());
+
+  return (
+    <div className="min-h-[100dvh] bg-[#16241E] font-sans text-[#2B2420] antialiased selection:bg-[#8B2E3F]/20">
+      <ChalkKeyframes />
+
+      {/* Desktop only: the board stays beside the scrolling invitation. It repeats content, so it is hidden from assistive tech. */}
+      <aside
+        aria-hidden="true"
+        className="fixed inset-y-0 left-0 hidden items-center justify-center px-16 text-center text-[#F4EFE6] md:right-[460px] md:flex lg:right-[480px]"
+      >
+        <BoardSurface frame sprigs />
+        {/* Between md and lg the panel is too narrow for text, so it stays a plain board. */}
+        <div className="relative hidden max-w-md lg:block">
+          {opened ? (
+            <div className="cv-fade">
+              <p className={`leading-[1.15] ${SCRIPT} text-6xl lg:text-7xl`}>
+                {bride}
+                <span className="block font-playfair text-2xl italic text-[#C4D0C5]">&amp;</span>
+                {groom}
+              </p>
+              {date && <p className="mt-6 font-playfair text-lg">{date}</p>}
+            </div>
+          ) : (
+            quote && (
+              <>
+                <p className="text-pretty font-playfair text-lg italic leading-relaxed">{quote}</p>
+                {invitation.quoteSource?.trim() && (
+                  <p className="mt-4 text-sm font-semibold text-[#C4D0C5]">{invitation.quoteSource}</p>
+                )}
+              </>
+            )
+          )}
+        </div>
+      </aside>
+
+      <div className="relative ml-auto min-h-[100dvh] w-full overflow-x-hidden bg-[#FAF8F5] md:w-[460px] lg:w-[480px]">
+        {!opened ? (
+          <Cover bride={bride} groom={groom} date={date} guestName={guest?.name?.trim() || null} onOpen={handleOpen} />
+        ) : (
+          <main className="cv-fade">
+            <Hero invitation={invitation} photo={heroPhoto} bride={bride} groom={groom} date={date} />
+
+            {quote && <Quote text={quote} source={invitation.quoteSource} />}
+
+            <section aria-labelledby="cv-couple" className="px-6 py-12">
+              <SectionTitle title="Mempelai" id="cv-couple" lead={copy.coupleIntro} />
+              <Person
+                role="Putri"
+                nickName={bride}
+                fullName={invitation.brideFullName}
+                photoUrl={invitation.bridePhotoUrl}
+                father={invitation.brideFather}
+                mother={invitation.brideMother}
+                instagram={invitation.brideInstagram}
+                tilt="-rotate-1"
+              />
+              <p aria-hidden="true" className={`my-8 text-center text-5xl text-[#4E6B50] ${SCRIPT}`}>
+                &amp;
+              </p>
+              <Person
+                role="Putra"
+                nickName={groom}
+                fullName={invitation.groomFullName}
+                photoUrl={invitation.groomPhotoUrl}
+                father={invitation.groomFather}
+                mother={invitation.groomMother}
+                instagram={invitation.groomInstagram}
+                tilt="rotate-1"
+              />
+            </section>
+
+            <Countdown invitation={invitation} />
+
+            {events.length > 0 && (
+              <section aria-labelledby="cv-events" className="px-6 py-12">
+                <SectionTitle title="Rangkaian Acara" id="cv-events" />
+                <div className="space-y-4">
+                  {events.map((event) => (
+                    <EventCard key={event.label} event={event} invitation={invitation} couple={couple} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {data.loveStories.length > 0 && <LoveStory items={data.loveStories} />}
+
+            {data.gallery.length > 0 && <Gallery items={data.gallery} />}
+
+            {hasGift && (
+              <Gift intro={copy.giftIntro} accounts={data.bankAccounts} address={invitation.giftAddress?.trim() || null} />
+            )}
+
+            <Rsvp data={data} guest={guest} rsvp={rsvp} />
+
+            <footer className="relative px-6 pb-20 pt-14 text-center text-[#F4EFE6]">
+              <BoardSurface />
+              <div className="relative">
+                <p className="text-sm text-[#C4D0C5]">{copy.thanks}</p>
+                <p className={`mt-3 text-balance break-words text-5xl leading-tight ${SCRIPT}`}>
+                  {bride} &amp; {groom}
+                </p>
+                <ChalkStroke className="mx-auto mt-2 text-[#C4D0C5]" />
+                <p className="mt-8 text-xs text-[#C4D0C5]">Powered by WeddingPlan</p>
+              </div>
+            </footer>
+          </main>
+        )}
+      </div>
+
+      {opened && music.hasMusic && <MusicButton isPlaying={music.isPlaying} onToggle={music.toggle} />}
     </div>
   );
 };

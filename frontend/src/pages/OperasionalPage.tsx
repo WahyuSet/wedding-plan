@@ -4,14 +4,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Clock,
   Plus,
   RotateCcw,
   CheckCircle2,
   Circle,
-  Calendar,
   User,
-  AlertCircle,
   Trash2,
   Edit2,
   ChevronDown,
@@ -19,9 +16,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../lib/api.js";
-import { OperasionalTask, ApiResponse } from "../types/index.js";
+import { type OperasionalTask, type ApiResponse } from "../types/index.js";
 import { Topbar } from "../components/layout/Topbar.js";
-import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
+import { Card } from "../components/ui/Card.js";
 import { Button } from "../components/ui/Button.js";
 import { Badge } from "../components/ui/Badge.js";
 import { Input } from "../components/ui/Input.js";

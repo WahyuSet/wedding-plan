@@ -13,15 +13,12 @@ import {
   CheckCircle2,
   Calendar,
   Zap,
-  TrendingUp,
   ShieldCheck,
-  CheckCircle,
-  ExternalLink,
   ChevronRight,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../lib/api.js";
-import { DashboardSummary, ApiResponse } from "../types/index.js";
+import { type DashboardSummary, type ApiResponse } from "../types/index.js";
 import { formatRupiah, formatShortRupiah, formatDateIndo } from "../lib/utils.js";
 import { Card, CardHeader, CardTitle, CardDescription } from "../components/ui/Card.js";
 import { Badge } from "../components/ui/Badge.js";

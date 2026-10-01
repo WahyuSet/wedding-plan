@@ -1,39 +1,55 @@
+import "dotenv/config";
+import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { DEFAULT_KUA_DOCUMENTS } from "../constants/kuaSeed.js";
 import { DEFAULT_OPERASIONAL_TASKS } from "../constants/operasionalSeed.js";
 import { SESERAHAN_TEMPLATES } from "../constants/seserahanTemplates.js";
 
-async function main() {
-  console.log("🌱 Menyiapkan Akun Demo Wedding Planner...");
+const isProduction = process.env.NODE_ENV === "production";
 
-  const demoEmail = "demo@wedding.com";
-  const demoPassword = "password123";
+async function seedAdmin(): Promise<void> {
+  const adminEmail = (process.env.ADMIN_EMAIL || "admin@weddingplan.id").toLowerCase();
+  const providedPassword = process.env.ADMIN_PASSWORD;
+  const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
 
-  // 0. Seed Superadmin Account
-  const adminEmail = "admin@weddingplan.id";
-  const adminPassword = "@admin2026";
-
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
-  });
-  if (existingAdmin) {
-    await prisma.user.delete({ where: { email: adminEmail } });
-    console.log("  Membersihkan akun superadmin lama...");
+  if (existing && !providedPassword) {
+    console.log(`  Superadmin ${adminEmail} sudah ada, dilewati.`);
+    return;
   }
 
-  const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
-  await prisma.user.create({
-    data: {
-      email: adminEmail,
-      username: "superadmin",
-      password: hashedAdminPassword,
-      role: "ADMIN",
-    },
-  });
-  console.log("  ✅ Akun Superadmin dibuat: admin@weddingplan.id");
+  let password = providedPassword;
+  if (!password) {
+    if (isProduction) {
+      throw new Error("ADMIN_PASSWORD wajib diisi saat seed di production.");
+    }
+    password = randomBytes(9).toString("base64url");
+    console.log(`  ADMIN_PASSWORD tidak diisi, dibuat password acak (hanya tampil sekali): ${password}`);
+  }
+  if (isProduction && password.length < 12) {
+    throw new Error("ADMIN_PASSWORD minimal 12 karakter di production.");
+  }
 
-  // 0.1 Seed System Settings / Feature Flags
+  const hashed = await bcrypt.hash(password, 10);
+
+  if (existing) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { password: hashed, role: "ADMIN", tokenVersion: { increment: 1 } },
+    });
+    console.log(`  Password superadmin ${adminEmail} diperbarui.`);
+    return;
+  }
+
+  const candidate = adminEmail.split("@")[0].replace(/[^a-z0-9_]/g, "").slice(0, 30);
+  const taken = candidate ? await prisma.user.findUnique({ where: { username: candidate } }) : null;
+  await prisma.user.create({
+    data: { email: adminEmail, username: candidate && !taken ? candidate : null, password: hashed, role: "ADMIN" },
+  });
+  console.log(`  Akun Superadmin dibuat: ${adminEmail}`);
+}
+
+async function seedSystemSettings(): Promise<void> {
   const defaultSettings = [
     { key: "digital_invitation", value: "true", label: "Modul Undangan Digital" },
     { key: "user_registration", value: "true", label: "Pendaftaran User Baru" },
@@ -47,9 +63,23 @@ async function main() {
       update: { label: setting.label },
     });
   }
-  console.log("  ✅ 3 Feature Flags default diinisialisasi.");
+  console.log("  3 Feature Flags default diinisialisasi.");
+}
 
-  // Hapus jika sudah ada sebelumnya agar fresh
+async function main() {
+  console.log("Menyiapkan data awal Wedding Planner...");
+
+  await seedAdmin();
+  await seedSystemSettings();
+
+  if (isProduction) {
+    console.log("Production: akun demo dan data contoh dilewati.");
+    return;
+  }
+
+  const demoEmail = "demo@wedding.com";
+  const demoPassword = "password123";
+
   const existing = await prisma.user.findUnique({
     where: { email: demoEmail },
   });
@@ -210,9 +240,7 @@ async function main() {
     })),
   });
 
-  console.log("\n✅ AKUN DEMO SIAP DIGUNAKAN!");
-  console.log("📧 Email    : demo@wedding.com");
-  console.log("🔑 Password : password123\n");
+  console.log("\nAkun demo siap (hanya development): demo@wedding.com / password123\n");
 }
 
 main()
