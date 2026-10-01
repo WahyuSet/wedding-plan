@@ -6,9 +6,10 @@ Fiturnya selesai diimplementasi 2026-10-01 (keempat fase di [RENCANA-UNDANGAN-DO
 
 Yang sudah dan belum teruji per tanggal itu:
 
-- Sudah: test otomatis backend dan frontend; ketiga tema dibuka di `http://undangan.localhost:5000` (mode development); backend hasil build dijalankan dengan `NODE_ENV=production` tanpa Docker dan lulus pengecekan yang sama dengan job CI `image`.
-- **Belum: `docker build` itu sendiri.** Docker tidak terpasang di mesin pengembang. Job `image` di `.github/workflows/ci.yml` yang mem-build image dan mengeceknya; pastikan job itu hijau sebelum deploy.
-- Belum: HTTPS sungguhan, proxy/CDN di depan backend, dan pratinjau link di aplikasi WhatsApp.
+- Sudah: test otomatis backend dan frontend; ketiga tema dibuka di `http://undangan.localhost:5000` (mode development); backend hasil build dijalankan dengan `NODE_ENV=production` tanpa Docker.
+- Sudah: image Docker dibuild dan dicek oleh job `image` di `.github/workflows/ci.yml`, lulus pada pull request WahyuSet/wedding-plan#1 (2026-10-01). Job itu menjalankan container dengan `INVITATION_URL=http://undangan.test` dan mengecek robots, shell HTML, aset, redirect akar, penutupan endpoint login, dan `invitation_url`.
+- Docker tidak terpasang di mesin pengembang, jadi job `image` adalah satu-satunya uji build image. Pastikan job itu hijau untuk commit yang akan di-deploy.
+- **Belum: HTTPS sungguhan, proxy/CDN di depan backend, dan pratinjau link di aplikasi WhatsApp.** Ketiganya baru bisa dicek saat deploy (bagian 6).
 
 ## 1. Gambaran
 

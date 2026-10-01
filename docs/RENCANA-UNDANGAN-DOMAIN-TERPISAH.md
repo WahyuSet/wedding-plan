@@ -1,6 +1,6 @@
 # Rencana Implementasi: Undangan Digital di Domain Terpisah
 
-Status (2026-10-01): **keempat fase selesai diimplementasi, belum pernah di-deploy**. Bila `INVITATION_URL` diisi, backend melayani domain undangan dan dashboard membuat link langsung ke domain itu. `docker build` belum pernah dijalankan (Docker tidak ada di mesin pengembang); job CI `image` yang memverifikasinya.
+Status (2026-10-01): **keempat fase selesai diimplementasi, belum pernah di-deploy**. Bila `INVITATION_URL` diisi, backend melayani domain undangan dan dashboard membuat link langsung ke domain itu. Image Docker sudah dibuild dan dicek oleh job CI `image` (lulus di pull request WahyuSet/wedding-plan#1); Docker tidak ada di mesin pengembang, jadi job itu satu-satunya uji build image.
 Catatan deploy untuk agent ada di [DEPLOY-UNDANGAN-DIGITAL.md](DEPLOY-UNDANGAN-DIGITAL.md).
 
 ## 1. Tujuan
